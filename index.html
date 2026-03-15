@@ -44,33 +44,35 @@ html,body{
 #topbar{
   display:flex;
   align-items:center;
-  gap:10px;
-  padding:7px 12px;
+  gap:8px;
+  padding:6px 10px;
   background:var(--s1);
   border-bottom:1px solid var(--border);
   flex-shrink:0;
-  flex-wrap:wrap;
+  flex-wrap:nowrap;
+  min-height:0;
 }
 .logo{
-  font-size:15px;
+  font-size:14px;
   font-weight:700;
   letter-spacing:0.18em;
   color:var(--accent);
+  white-space:nowrap;
 }
-.logo span{color:var(--muted);font-weight:400;font-size:10px;letter-spacing:0.05em;margin-left:6px;}
+.logo span{color:var(--muted);font-weight:400;font-size:9px;letter-spacing:0.05em;margin-left:5px;}
 .topbar-group{display:flex;align-items:center;gap:5px;}
 .topbar-label{font-size:9px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;}
 .spacer{flex:1;}
 
 /* BPM */
 #bpm-display{
-  font-size:18px;font-weight:700;color:var(--accent);
-  min-width:38px;text-align:center;
+  font-size:16px;font-weight:700;color:var(--accent);
+  min-width:34px;text-align:center;
   cursor:pointer;
   border-bottom:1px solid var(--border);
   padding:0 2px;
 }
-#bpm-slider{width:80px;accent-color:var(--accent);cursor:pointer;}
+#bpm-slider{width:70px;accent-color:var(--accent);cursor:pointer;}
 
 /* Steps */
 .step-btn{
@@ -79,7 +81,7 @@ html,body{
   color:var(--muted);
   font-family:'JetBrains Mono',monospace;
   font-size:10px;
-  padding:4px 8px;
+  padding:4px 7px;
   cursor:pointer;
   border-radius:3px;
   transition:all 0.12s;
@@ -94,15 +96,34 @@ html,body{
   color:var(--text);
   font-family:'JetBrains Mono',monospace;
   font-size:10px;
-  padding:5px 12px;
+  padding:5px 10px;
   cursor:pointer;
   border-radius:3px;
   letter-spacing:0.08em;
   transition:all 0.12s;
+  white-space:nowrap;
 }
 .tbn:active{transform:scale(0.93);}
 .tbn.active{background:var(--accent);color:#000;border-color:var(--accent);}
 .tbn.warn{border-color:var(--kick);}
+
+/* ── MENU PANEL ── */
+#menu-panel{
+  background:var(--s1);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+  overflow:hidden;
+  max-height:0;
+  transition:max-height 0.25s ease;
+}
+#menu-panel.open{max-height:52px;}
+#menu-inner{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:6px 10px;
+  flex-wrap:nowrap;
+}
 #swing-val{color:var(--accent);font-weight:700;font-size:10px;min-width:24px;}
 
 /* ── BANDS ── */
@@ -123,37 +144,81 @@ html,body{
   align-items:stretch;
 }
 .band-label{
-  width:48px;
+  width:44px;
+  position:relative;
   display:flex;
   flex-direction:column;
   align-items:center;
-  justify-content:center;
-  gap:3px;
-  cursor:pointer;
+  justify-content:flex-end;
+  gap:0;
   border-radius:4px;
-  border:1px solid transparent;
-  padding:3px 2px;
+  border:1px solid var(--border);
+  padding:0;
   flex-shrink:0;
+  overflow:hidden;
+  background:var(--s2);
+  cursor:pointer;
   transition:border-color 0.15s;
 }
 .band-label.selected{border-color:currentColor;}
+.band-label .vol-fill{
+  position:absolute;
+  bottom:0;left:0;right:0;
+  transition:height 0.08s;
+  opacity:0.18;
+  pointer-events:none;
+}
 .band-label .inst-name{
-  font-size:8px;
+  position:relative;
+  font-size:7px;
   font-weight:700;
-  letter-spacing:0.14em;
+  letter-spacing:0.12em;
   text-transform:uppercase;
+  padding:2px 0 1px;
+  z-index:1;
 }
 .band-label .inst-mute{
-  font-size:8px;
+  position:relative;
+  font-size:7px;
   color:var(--muted);
   cursor:pointer;
   border:1px solid var(--border);
   border-radius:2px;
   padding:1px 4px;
-  margin-top:2px;
+  margin-bottom:4px;
   background:var(--s2);
+  z-index:1;
+  transition:all 0.12s;
 }
 .band-label .inst-mute.muted{background:var(--muted);color:#000;}
+.band-label .inst-yparam{
+  position:relative;
+  font-size:6px;
+  font-weight:700;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  opacity:0.9;
+  z-index:1;
+  text-align:center;
+  line-height:1.2;
+  padding:0 2px;
+}
+.band-label .vol-slider{
+  position:absolute;
+  left:50%;
+  top:4px;
+  bottom:22px;
+  width:28px;
+  transform:translateX(-50%) rotate(180deg);
+  writing-mode:vertical-lr;
+  -webkit-appearance:none;
+  appearance:none;
+  background:transparent;
+  cursor:ns-resize;
+  z-index:2;
+  opacity:0;
+}
+.band-label:hover .vol-slider{ opacity:1; }
 .band-wrap{
   flex:1;
   position:relative;
@@ -253,6 +318,45 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   border-radius:1px;
 }
 
+/* ── Y-PARAM PICKER ── */
+#yparam-picker{
+  position:fixed;
+  background:var(--s1);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:6px;
+  z-index:999;
+  display:none;
+  flex-direction:column;
+  gap:3px;
+  min-width:110px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.6);
+}
+#yparam-picker.visible{display:flex;}
+.yparam-opt{
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px;
+  padding:4px 8px;
+  cursor:pointer;
+  border-radius:3px;
+  color:var(--muted);
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  border:1px solid transparent;
+  transition:all 0.1s;
+}
+.yparam-opt:hover{color:var(--text);background:var(--s2);}
+.yparam-opt.active{color:var(--accent);border-color:var(--accent);}
+.yparam-label{
+  font-size:8px;
+  color:var(--muted);
+  padding:2px 8px 4px;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  border-bottom:1px solid var(--border);
+  margin-bottom:2px;
+}
+
 /* Scrollbar hide */
 ::-webkit-scrollbar{display:none;}
 </style>
@@ -263,40 +367,44 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   <!-- TOP BAR -->
   <div id="topbar">
     <span class="logo">RKTR <span>drum synth</span></span>
-
     <div class="topbar-group">
       <span class="topbar-label">BPM</span>
       <input type="range" id="bpm-slider" min="60" max="200" value="120" step="1">
       <span id="bpm-display">120</span>
     </div>
-
     <div class="topbar-group">
       <span class="topbar-label">STEPS</span>
       <button class="step-btn" data-steps="8">8</button>
       <button class="step-btn active" data-steps="16">16</button>
       <button class="step-btn" data-steps="32">32</button>
     </div>
-
-    <div class="topbar-group">
-      <span class="topbar-label">SWING</span>
-      <input type="range" id="swing-slider" min="0" max="0.15" step="0.005" value="0" style="width:60px;accent-color:var(--accent);">
-      <span id="swing-val">0%</span>
-    </div>
-
     <div class="spacer"></div>
-
-    <div class="topbar-group">
-      <span class="topbar-label">SCENE</span>
-      <select id="scene-select" style="background:var(--s2);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 6px;border-radius:3px;cursor:pointer;">
-        <option value="">— pick —</option>
-      </select>
-    </div>
-
-    <button class="tbn" id="quant-btn">QUANT OFF</button>
-    <button class="tbn warn" id="clear-btn">CLR</button>
     <button class="tbn active" id="play-btn">▶ PLAY</button>
+    <button class="tbn" id="menu-btn">☰</button>
     <button class="tbn" id="fs-btn" title="Fullscreen">⛶</button>
   </div>
+
+  <!-- COLLAPSIBLE MENU -->
+  <div id="menu-panel">
+    <div id="menu-inner">
+      <div class="topbar-group">
+        <span class="topbar-label">SWING</span>
+        <input type="range" id="swing-slider" min="0" max="0.15" step="0.005" value="0" style="width:60px;accent-color:var(--accent);">
+        <span id="swing-val">0%</span>
+      </div>
+      <div class="topbar-group">
+        <span class="topbar-label">SCENE</span>
+        <select id="scene-select" style="background:var(--s2);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 6px;border-radius:3px;cursor:pointer;">
+          <option value="">— pick —</option>
+        </select>
+      </div>
+      <button class="tbn" id="quant-btn">QUANT OFF</button>
+      <button class="tbn warn" id="clear-btn">CLR</button>
+    </div>
+  </div>
+
+  <!-- Y-PARAM PICKER -->
+  <div id="yparam-picker"></div>
 
   <!-- BANDS -->
   <div id="bands"></div>
@@ -426,8 +534,8 @@ function mkDist(k) {
   return ws;
 }
 
-function playKick(t, vel = 1) {
-  const p = SP.kick;
+function playKick(t, vel = 1, overrides = {}) {
+  const p = { ...SP.kick, ...overrides };
   // Main body oscillator
   const g = AC.createGain();
   const vol = vel * (0.55 + p.body * 0.45);
@@ -476,8 +584,8 @@ function playKick(t, vel = 1) {
   }
 }
 
-function playSnare(t, vel = 1) {
-  const p = SP.snare;
+function playSnare(t, vel = 1, overrides = {}) {
+  const p = { ...SP.snare, ...overrides };
   // Noise layer
   const gn = AC.createGain();
   gn.gain.setValueAtTime(vel * p.noise * 0.6, t);
@@ -520,8 +628,8 @@ function playSnare(t, vel = 1) {
   }
 }
 
-function playHihat(t, vel = 1, open = false) {
-  const p = SP.hihat;
+function playHihat(t, vel = 1, open = false, overrides = {}) {
+  const p = { ...SP.hihat, ...overrides };
   const dec = open ? p.opendec : p.decay;
   const atk = p.attack || 0.005;
   const g = AC.createGain();
@@ -548,8 +656,8 @@ function playHihat(t, vel = 1, open = false) {
   }
 }
 
-function playTom(t, vel = 1) {
-  const p = SP.tom;
+function playTom(t, vel = 1, overrides = {}) {
+  const p = { ...SP.tom, ...overrides };
   const atk = p.attack || 0;
   const g = AC.createGain();
   g.gain.setValueAtTime(atk > 0.001 ? 0.001 : vel * (0.45 + p.body * 0.55), t);
@@ -569,15 +677,15 @@ function playTom(t, vel = 1) {
   osc.start(t); osc.stop(t + atk + p.decay + 0.1);
 }
 
-function velCurve(v) { return Math.pow(v, 2.2); } // perceptual power curve
+function velCurve(v) { return Math.pow(v, 2.2); }
 
-function triggerInst(id, t, vel, dur) {
+function triggerInst(id, t, vel, dur, overrides = {}) {
   if (muted[id]) return;
-  const v = velCurve(vel);
-  if (id === 'kick')  playKick(t, v);
-  else if (id === 'snare') playSnare(t, v);
-  else if (id === 'hihat') playHihat(t, v, dur > 1);
-  else if (id === 'tom')   playTom(t, v);
+  const v = velCurve(vel) * (instVol[id] ?? 1);
+  if (id === 'kick')  playKick(t, v, overrides);
+  else if (id === 'snare') playSnare(t, v, overrides);
+  else if (id === 'hihat') playHihat(t, v, dur > 1, overrides);
+  else if (id === 'tom')   playTom(t, v, overrides);
 }
 
 // ─── Sequencer ────────────────────────────────────────────────────
@@ -590,7 +698,14 @@ function scheduleStep(step, t) {
     for (const n of ns) {
       if (n.step === step) {
         const swingOff = (step % 2 === 1) ? swing * stepDur() : 0;
-        triggerInst(inst.id, t + swingOff, n.vel, n.dur);
+        // Build param override from entanglement
+        const override = {};
+        const yp = instYParam[inst.id];
+        if (n.entangled && yp && yp !== 'none' && yp !== null) {
+          const range = instYParamRange[inst.id] || { min:0, max:1 };
+          override[yp] = range.min + (n.yVal ?? n.vel) * (range.max - range.min);
+        }
+        triggerInst(inst.id, t + swingOff, n.vel, n.dur, override);
       }
     }
   }
@@ -722,7 +837,7 @@ function renderBand(instId) {
     cx.fillRect(x, 0, durW + 2, h);
 
     // Body
-    cx.globalAlpha = 0.18 + n.vel * 0.82;
+    cx.globalAlpha = isPreviewNote ? 0.25 : (0.18 + n.vel * 0.82);
     cx.fillStyle = col;
     if (cx.roundRect) {
       cx.beginPath(); cx.roundRect(x + 1.5, ny, durW - 2, nh, 3); cx.fill();
@@ -735,6 +850,28 @@ function renderBand(instId) {
     cx.fillStyle = col;
     cx.fillRect(x + 1.5, ny, durW - 2, 2.5);
 
+    // Diagonal hatch for entangled notes
+    if (n.entangled && instYParam[instId]) {
+      cx.save();
+      cx.beginPath();
+      if (cx.roundRect) cx.roundRect(x + 1.5, ny, durW - 2, nh, 3);
+      else cx.rect(x + 1.5, ny, durW - 2, nh);
+      cx.clip();
+      cx.strokeStyle = col;
+      cx.globalAlpha = 0.35;
+      cx.lineWidth = 1;
+      const spacing = 5;
+      const diagLen = durW + nh;
+      for (let d = -diagLen; d < diagLen; d += spacing) {
+        cx.beginPath();
+        cx.moveTo(x + 1.5 + d, ny);
+        cx.lineTo(x + 1.5 + d + nh, ny + nh);
+        cx.stroke();
+      }
+      cx.globalAlpha = 1;
+      cx.restore();
+    }
+
     // Left edge handle
     cx.fillStyle = '#fff';
     cx.globalAlpha = 0.5;
@@ -743,26 +880,28 @@ function renderBand(instId) {
     cx.fillRect(x + durW - 4, ny + 4, 2.5, nh - 8);
     cx.globalAlpha = 1;
 
-    // Velocity dot
-    cx.globalAlpha = 0.55;
-    cx.fillStyle = '#ffffff';
+    // Velocity dot — show yVal position if entangled
+    const dotY = n.entangled && instYParam[instId]
+      ? ny + nh * (1 - (n.yVal ?? n.vel))
+      : ny + 6;
+    cx.globalAlpha = 0.85;
+    cx.fillStyle = n.entangled && instYParam[instId] ? col : '#ffffff';
     cx.beginPath();
-    cx.arc(x + durW * 0.5, ny + 6, 2, 0, Math.PI * 2);
+    cx.arc(x + durW * 0.5, dotY, n.entangled && instYParam[instId] ? 3 : 2, 0, Math.PI * 2);
     cx.fill();
     cx.globalAlpha = 1;
 
-    // Step label (show as beat number, support .5)
+    // Step label
     if (stepW > 16) {
       cx.fillStyle = col;
       cx.globalAlpha = 0.6;
       cx.font = `bold ${Math.min(9, stepW * 0.42)}px 'JetBrains Mono', monospace`;
       cx.textAlign = 'center';
       cx.textBaseline = 'bottom';
-      const label = n.step % 1 === 0.5 ? (n.step + 0.5) : (n.step + 1);
       cx.fillText(n.step + 1, x + durW * 0.5, h - 1);
       cx.globalAlpha = 1;
     }
-    cx.globalAlpha = 1; // reset after each note
+    cx.globalAlpha = 1;
   }
 
   // Muted overlay
@@ -944,7 +1083,9 @@ function setupBandEvents(instId, canvas) {
 
     if (ds.mode === 'vel') {
       const deltaVel = (ds.velDragStartY - y) / canvas.offsetHeight * 1.5;
-      ds.hitNote.vel = Math.max(0.05, Math.min(1.0, ds.velDragStartVel + deltaVel));
+      const newVel = Math.max(0.05, Math.min(1.0, ds.velDragStartVel + deltaVel));
+      ds.hitNote.vel = newVel;
+      ds.hitNote.yVal = newVel; // keep yVal in sync with vel drag
       renderBand(instId); return;
     }
 
@@ -976,10 +1117,11 @@ function setupBandEvents(instId, canvas) {
         .sort((a, b) => a.step - b.step)[0];
       const maxEnd = blocker ? blocker.step : steps;
       const eStep = Math.min(maxEnd, Math.max(sStep + 1, curStep + 1));
-      const dur = Math.round(eStep - sStep); // always integer
+      const dur = Math.round(eStep - sStep);
+      const vel = yToVel(ds.startY);
       notes[instId] = [
         ...(notes[instId] || []).filter(n => n !== ds.drawNote),
-        { step: sStep, vel: yToVel(ds.startY), dur }
+        { step: sStep, vel, dur, yVal: vel }
       ];
       ds.drawNote = notes[instId][notes[instId].length - 1];
       renderBand(instId);
@@ -993,9 +1135,13 @@ function setupBandEvents(instId, canvas) {
     ds.active = false;
 
     if (ds.mode === 'vel' || ds.mode === 'move' || ds.mode === 'pending-hit') {
-      // pending-hit with no movement = tap = preview sound
       if (ds.mode === 'pending-hit' && ds.hitNote) {
-        triggerInst(instId, AC.currentTime + 0.01, ds.hitNote.vel, ds.hitNote.dur);
+        // Single tap on note body = toggle entanglement if Y-param is set, else preview
+        if (instYParam[instId] !== null) {
+          ds.hitNote.entangled = !ds.hitNote.entangled;
+        } else {
+          triggerInst(instId, AC.currentTime + 0.01, ds.hitNote.vel, ds.hitNote.dur);
+        }
       }
       renderBand(instId); return;
     }
@@ -1024,13 +1170,14 @@ function setupBandEvents(instId, canvas) {
       if (hit) {
         triggerInst(instId, AC.currentTime + 0.01, hit.note.vel, hit.note.dur);
       } else {
-        const step = xToStep(ds.startX); // already integer from Math.floor
+        const step = xToStep(ds.startX);
         const dur = 1;
         const vel = yToVel(ds.startY);
+        const yVal = vel; // yVal = same as vel initially
         const safe = Math.max(0, Math.min(steps - dur, step));
         notes[instId] = [...(notes[instId] || []).filter(n =>
           n.step + n.dur <= safe || n.step >= safe + dur
-        ), { step: safe, vel, dur }];
+        ), { step: safe, vel, dur, yVal }];
         triggerInst(instId, AC.currentTime + 0.01, vel, dur);
       }
     }
@@ -1075,6 +1222,81 @@ function setupBandEvents(instId, canvas) {
 }
 
 // ─── Build DOM ────────────────────────────────────────────────────
+const instVol = { kick:1, snare:1, hihat:1, tom:1 };
+const instYParam = { kick:null, snare:null, hihat:null, tom:null }; // null = volume
+
+function updateVolFill(instId) {
+  const fill = document.getElementById('volfill-' + instId);
+  if (fill) fill.style.height = (instVol[instId] * 100) + '%';
+}
+
+function showYParamPicker(instId, anchorEl) {
+  const picker = document.getElementById('yparam-picker');
+  const defs = SYNTH_DEFS[instId] || [];
+  const current = instYParam[instId];
+  const inst = INSTRUMENTS.find(i => i.id === instId);
+
+  picker.innerHTML = `<div class="yparam-label" style="color:${inst.color}">Y → ${inst.name}</div>` +
+    `<div class="yparam-opt${current === 'none' ? ' active' : ''}" data-key="none">— None —</div>` +
+    defs.map(d => `<div class="yparam-opt${current === d.k ? ' active' : ''}" data-key="${d.k}" data-min="${d.min}" data-max="${d.max}">${d.l}</div>`).join('');
+
+  // Position: to the right of anchor, clamped to screen
+  picker.classList.add('visible');
+  const r = anchorEl.getBoundingClientRect();
+  const pw = picker.offsetWidth || 120;
+  const ph = picker.offsetHeight || 200;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let left = r.right + 6;
+  let top = r.top - 10;
+  if (left + pw > vw - 6) left = r.left - pw - 6; // flip to left if off-screen
+  if (left < 6) left = 6;
+  if (top + ph > vh - 6) top = vh - ph - 6;
+  if (top < 6) top = 6;
+  picker.style.left = left + 'px';
+  picker.style.top = top + 'px';
+
+  picker.querySelectorAll('.yparam-opt').forEach(opt => {
+    opt.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const k = opt.dataset.key;
+      instYParam[instId] = k === 'none' ? 'none' : k;
+      if (instYParam[instId] && instYParam[instId] !== 'none') {
+        instYParamRange[instId] = { min: +opt.dataset.min, max: +opt.dataset.max };
+      }
+      picker.classList.remove('visible');
+      updateMuteBtn(instId);
+      renderBand(instId);
+    });
+  });
+}
+
+function updateMuteBtn(instId) {
+  const muteBtn = document.getElementById('mute-' + instId);
+  const yInd = document.getElementById('yparam-ind-' + instId);
+  if (!muteBtn) return;
+  muteBtn.classList.toggle('muted', muted[instId]);
+  if (yInd) {
+    const param = instYParam[instId];
+    if (param && param !== 'none') {
+      yInd.textContent = param.toUpperCase();
+      yInd.style.display = 'block';
+    } else {
+      yInd.textContent = '';
+      yInd.style.display = 'none';
+    }
+  }
+}
+
+// Close picker on outside tap
+document.addEventListener('pointerdown', (e) => {
+  const picker = document.getElementById('yparam-picker');
+  if (!picker.contains(e.target)) picker.classList.remove('visible');
+}, true);
+
+const instYParamRange = { kick:{min:0,max:1}, snare:{min:0,max:1}, hihat:{min:0,max:1}, tom:{min:0,max:1} };
+// Saved per-note entanglement state for the 3-way cycle (off → all → saved → off)
+const instEntangleSaved = { kick:null, snare:null, hihat:null, tom:null };
+
 function buildBands() {
   const container = document.getElementById('bands');
   container.innerHTML = '';
@@ -1086,31 +1308,100 @@ function buildBands() {
     lbl.className = 'band-label' + (inst.id === selectedInst ? ' selected' : '');
     lbl.style.color = inst.color;
     lbl.innerHTML = `
+      <div class="vol-fill" id="volfill-${inst.id}" style="background:${inst.color};height:${instVol[inst.id]*100}%"></div>
       <span class="inst-name">${inst.name}</span>
+      <span class="inst-yparam" id="yparam-ind-${inst.id}" style="display:${instYParam[inst.id] ? 'block' : 'none'};color:${inst.color}">${instYParam[inst.id] || ''}</span>
       <span class="inst-mute${muted[inst.id] ? ' muted' : ''}" id="mute-${inst.id}">M</span>
     `;
-    lbl.addEventListener('click', (e) => {
-      if (e.target.classList.contains('inst-mute')) {
-        muted[inst.id] = !muted[inst.id];
-        e.target.classList.toggle('muted', muted[inst.id]);
-        renderBand(inst.id);
-        return;
+
+    // Mute button: tap only
+    const muteBtn = lbl.querySelector('.inst-mute');
+    muteBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    muteBtn.addEventListener('pointerup', (e) => {
+      e.stopPropagation();
+      muted[inst.id] = !muted[inst.id];
+      muteBtn.classList.toggle('muted', muted[inst.id]);
+      renderBand(inst.id);
+    });
+
+    let holdTimer = null;
+    let pointerStartY = 0;
+    let volStartVal = 1;
+    let didHold = false;
+    let isDragging = false;
+
+    lbl.addEventListener('pointerdown', (e) => {
+      if (e.target === muteBtn) return;
+      pointerStartY = e.clientY;
+      volStartVal = instVol[inst.id];
+      didHold = false;
+      isDragging = false;
+      holdTimer = setTimeout(() => {
+        didHold = true;
+        holdTimer = null;
+        showYParamPicker(inst.id, lbl);
+      }, 400);
+      lbl.setPointerCapture(e.pointerId);
+    });
+
+    lbl.addEventListener('pointermove', (e) => {
+      if (e.target === muteBtn || (!isDragging && holdTimer === null && !didHold)) return;
+      const dy = e.clientY - pointerStartY;
+      if (!isDragging && Math.abs(dy) > 8) {
+        isDragging = true;
+        clearTimeout(holdTimer); holdTimer = null;
       }
-      selectInst(inst.id);
+      if (isDragging) {
+        instVol[inst.id] = Math.max(0, Math.min(1, volStartVal - dy / lbl.offsetHeight * 1.5));
+        updateVolFill(inst.id);
+      }
+    });
+
+    lbl.addEventListener('pointerup', (e) => {
+      if (e.target === muteBtn) return;
+      if (holdTimer !== null) {
+        clearTimeout(holdTimer); holdTimer = null;
+        if (!isDragging) {
+          // Clean tap
+          if (instYParam[inst.id] !== null) {
+          const ns = notes[inst.id] || [];
+          const allOn  = ns.length > 0 && ns.every(n => n.entangled);
+          const allOff = ns.every(n => !n.entangled);
+          const hasSaved = instEntangleSaved[inst.id] !== null;
+
+          if (allOff) {
+            instEntangleSaved[inst.id] = ns.map(n => n.entangled);
+            ns.forEach(n => { n.entangled = true; });
+          } else if (allOn && hasSaved) {
+            const saved = instEntangleSaved[inst.id];
+            ns.forEach((n, i) => { n.entangled = saved[i] ?? false; });
+          } else {
+            instEntangleSaved[inst.id] = ns.map(n => n.entangled);
+            ns.forEach(n => { n.entangled = false; });
+          }
+          renderBand(inst.id);
+        } else {
+          selectInst(inst.id);
+        }
+      } // end !isDragging
+      }
+      isDragging = false;
+      didHold = false;
+    });
+
+    lbl.addEventListener('pointercancel', () => {
+      clearTimeout(holdTimer); holdTimer = null; didHold = false; isDragging = false;
     });
 
     const wrap = document.createElement('div');
     wrap.className = 'band-wrap';
-
     const canvas = document.createElement('canvas');
     canvas.className = 'band-cv';
     canvas.id = 'cv-' + inst.id;
-
     wrap.appendChild(canvas);
     row.appendChild(lbl);
     row.appendChild(wrap);
     container.appendChild(row);
-
     cvs[inst.id] = canvas;
     setupBandEvents(inst.id, canvas);
   });
@@ -1393,6 +1684,12 @@ function loadScene(scene) {
 }
 
 // ─── Controls ─────────────────────────────────────────────────────
+document.getElementById('menu-btn').addEventListener('click', function() {
+  const panel = document.getElementById('menu-panel');
+  const open = panel.classList.toggle('open');
+  this.classList.toggle('active', open);
+});
+
 document.getElementById('play-btn').addEventListener('click', function () {
   isPlaying = !isPlaying;
   this.textContent = isPlaying ? '■ STOP' : '▶ PLAY';
