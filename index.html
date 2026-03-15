@@ -1434,7 +1434,9 @@ document.querySelectorAll('.step-btn').forEach(btn => {
 document.getElementById('fs-btn').addEventListener('click', () => {
   const el = document.documentElement;
   if (!document.fullscreenElement) {
-    (el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen).call(el);
+    (el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen).call(el).then(() => {
+      screen.orientation?.lock('landscape').catch(() => {});
+    }).catch(() => {});
   } else {
     (document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen).call(document);
   }
