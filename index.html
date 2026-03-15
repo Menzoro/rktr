@@ -2,14 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#080810">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="RKTR">
-<meta name="mobile-web-app-capable" content="yes">
-<link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>RKTR — Beat Synthesizer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -43,8 +36,6 @@ html,body{
   display:flex;
   flex-direction:column;
   height:100dvh;
-  padding-top:env(safe-area-inset-top);
-  padding-bottom:env(safe-area-inset-bottom);
   width:100%;
   overflow:hidden;
 }
@@ -304,6 +295,7 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
     <button class="tbn" id="quant-btn">QUANT OFF</button>
     <button class="tbn warn" id="clear-btn">CLR</button>
     <button class="tbn active" id="play-btn">▶ PLAY</button>
+    <button class="tbn" id="fs-btn" title="Fullscreen">⛶</button>
   </div>
 
   <!-- BANDS -->
@@ -1439,6 +1431,18 @@ document.querySelectorAll('.step-btn').forEach(btn => {
   });
 });
 
+document.getElementById('fs-btn').addEventListener('click', () => {
+  const el = document.documentElement;
+  if (!document.fullscreenElement) {
+    (el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen).call(el);
+  } else {
+    (document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen).call(document);
+  }
+});
+document.addEventListener('fullscreenchange', () => {
+  document.getElementById('fs-btn').textContent = document.fullscreenElement ? '✕' : '⛶';
+});
+
 document.getElementById('synth-toggle-bar').addEventListener('click', () => {
   const panel = document.getElementById('synth-panel');
   const arrow = document.getElementById('stb-arrow');
@@ -1494,13 +1498,6 @@ window.addEventListener('resize', () => {
   Object.keys(ctxs).forEach(k => delete ctxs[k]);
   renderAll();
 });
-
-// ─── Service Worker ───────────────────────────────────────────────
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
-}
 </script>
 </body>
 </html>
