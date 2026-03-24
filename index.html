@@ -2,8 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>RKTR — Beat Synthesizer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#080810">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="RKTR">
+<title>RKTR</title>
+<link rel="manifest" href="manifest.json">
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -39,7 +50,7 @@ body{
   overflow:hidden;
   background:var(--bg);
   color:var(--text);
-  font-family:'JetBrains Mono',monospace;
+  font-family:'JetBrains Mono', 'Courier New', Courier, monospace;
   font-size:13px;
 }
 #app{
@@ -49,6 +60,9 @@ body{
   height:100dvh;
   width:100%;
   overflow:hidden;
+  padding-bottom:env(safe-area-inset-bottom);
+  padding-left:env(safe-area-inset-left);
+  padding-right:env(safe-area-inset-right);
 }
 
 /* ── TOP BAR ── */
@@ -83,7 +97,78 @@ body{
   border-bottom:1px solid var(--border);
   padding:0 2px;
 }
-#bpm-slider{width:70px;accent-color:var(--accent);cursor:pointer;}
+.top-slider{width:70px;accent-color:var(--accent);cursor:pointer;}
+
+/* ── GEAR DROPDOWN ── */
+#gear-wrap{
+  position:relative;
+}
+#gear-btn{
+  font-size:13px;
+  padding:4px 8px;
+}
+#gear-menu{
+  display:none;
+  position:absolute;
+  top:calc(100% + 6px);
+  right:0;
+  background:var(--s1);
+  border:1px solid var(--border);
+  border-radius:6px;
+  min-width:160px;
+  padding:6px;
+  z-index:1000;
+  box-shadow:0 6px 24px rgba(0,0,0,0.5);
+  flex-direction:column;
+  gap:2px;
+}
+#gear-menu.open{display:flex;}
+.gear-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:7px 10px;
+  border-radius:4px;
+  cursor:pointer;
+  font-size:10px;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  color:var(--text);
+  transition:background 0.1s;
+  touch-action:manipulation;
+}
+.gear-item:hover{background:var(--s2);}
+.gear-toggle{
+  width:28px;height:14px;
+  border-radius:7px;
+  background:var(--s3);
+  border:1px solid var(--border);
+  position:relative;
+  transition:background 0.15s, border-color 0.15s;
+  flex-shrink:0;
+}
+.gear-toggle::after{
+  content:'';
+  position:absolute;
+  top:2px;left:2px;
+  width:8px;height:8px;
+  border-radius:50%;
+  background:var(--muted);
+  transition:transform 0.15s, background 0.15s;
+}
+.gear-toggle.active{
+  background:rgba(0,229,200,0.2);
+  border-color:var(--accent);
+}
+.gear-toggle.active::after{
+  transform:translateX(14px);
+  background:var(--accent);
+}
+.gear-divider{
+  height:1px;
+  background:var(--border);
+  margin:4px 0;
+}
 
 /* Steps */
 .step-btn{
@@ -116,26 +201,18 @@ body{
 }
 .tbn:active{transform:scale(0.93);}
 .tbn.active{background:var(--accent);color:#000;border-color:var(--accent);}
-.tbn.warn{border-color:var(--kick);}
+.tbn.warn{border-color:var(--kick);position:relative;overflow:hidden;}
+#clr-fill{
+  position:absolute;
+  top:0;left:0;bottom:0;
+  width:0%;
+  background:var(--kick);
+  opacity:0.35;
+  pointer-events:none;
+  transition:none;
+}
 
-/* ── MENU PANEL ── */
-#menu-panel{
-  background:var(--s1);
-  border-bottom:1px solid var(--border);
-  flex-shrink:0;
-  overflow:hidden;
-  max-height:0;
-  transition:max-height 0.25s ease;
-}
-#menu-panel.open{max-height:52px;}
-#menu-inner{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  padding:6px 10px;
-  flex-wrap:nowrap;
-}
-#swing-val{color:var(--accent);font-weight:700;font-size:10px;min-width:24px;}
+#swing-val{color:var(--accent);font-weight:700;font-size:10px;min-width:20px;}
 
 /* ── BANDS ── */
 #bands{
@@ -155,7 +232,7 @@ body{
   align-items:stretch;
 }
 .band-label{
-  width:54px;
+  width:58px;
   position:relative;
   display:flex;
   flex-direction:column;
@@ -188,20 +265,12 @@ body{
   padding:2px 0 1px;
   z-index:1;
 }
-.band-label .inst-mute{
-  position:relative;
-  font-size:9px;
-  color:var(--muted);
-  cursor:pointer;
-  border:1px solid var(--border);
-  border-radius:2px;
-  padding:3px 8px;
-  margin-bottom:4px;
-  background:var(--s2);
-  z-index:1;
-  transition:all 0.12s;
+.band-label.muted-swipe{
+  opacity:0.35;
 }
-.band-label .inst-mute.muted{background:var(--muted);color:#000;}
+.band-label.muted-swipe .inst-name{
+  text-decoration: line-through;
+}
 .band-label .inst-yparam{
   position:relative;
   font-size:6px;
@@ -426,52 +495,28 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   transition:none;
 }
 
-/* ── RECORD MODE TOGGLE ── */
-#rec-mode-toggle{
-  display:flex;
-  align-items:center;
-  gap:0;
-  border:1px solid var(--border);
-  border-radius:4px;
-  overflow:hidden;
-  flex-shrink:0;
-}
-.rec-mode-btn{
-  flex:1;padding:5px 8px;
-  font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;
-  letter-spacing:0.1em;text-transform:uppercase;
-  border:none;background:var(--s2);color:var(--muted);
-  cursor:pointer;transition:all 0.15s;
-}
-.rec-mode-btn.active{background:var(--s3);color:var(--accent);}
-.rec-mode-btn:not(:last-child){border-right:1px solid var(--border);}
-
 /* ── RECORD BUTTON ── */
 #sample-rec-btn{
   width:100%;padding:14px;border-radius:6px;cursor:pointer;
   font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
   letter-spacing:0.12em;text-transform:uppercase;border:2px solid var(--border);
-  background:var(--s3);color:var(--text);transition:background 0.15s, border-color 0.15s, transform 0.1s;
-  touch-action:none; /* prevent scroll on hold */
-  -webkit-user-select:none;
-  user-select:none;
+  background:var(--s3);color:var(--text);transition:background 0.15s, border-color 0.15s;
+  touch-action:manipulation;
+}
+#sample-rec-btn.preroll{
+  border-color:var(--muted);color:var(--muted);
 }
 #sample-rec-btn.recording{
-  background:#b01c1c;color:#fff;border-color:#e03030;
-  animation:pulse-rec 0.7s ease-in-out infinite alternate;
+  background:#8b0000;color:#ff6060;border-color:#e03030;
+  animation:pulse-rec 1s ease-in-out infinite alternate;
 }
-#sample-rec-btn.hold-ready{
-  border-color:var(--accent);color:var(--accent);
-}
-#sample-rec-btn:active:not(:disabled){transform:scale(0.97);}
 @keyframes pulse-rec{
-  from{box-shadow:0 0 0 0 rgba(224,48,48,0);}
-  to{box-shadow:0 0 0 8px rgba(224,48,48,0);}
+  from{border-color:#e03030;}
+  to{border-color:#ff6060;}
 }
 
 #sample-timer{
-  text-align:center;font-size:22px;font-weight:700;color:var(--accent);
-  font-family:'JetBrains Mono',monospace;min-height:28px;
+  font-family:'JetBrains Mono',monospace;
 }
 .sm-actions{display:flex;gap:8px;}
 .sm-btn{
@@ -479,96 +524,64 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   font-family:'JetBrains Mono',monospace;font-size:10px;
   font-weight:700;letter-spacing:0.1em;text-transform:uppercase;
   border:1px solid var(--border);background:var(--s2);color:var(--text);
-  transition:all 0.12s;
+  transition:all 0.12s;touch-action:manipulation;
 }
 .sm-btn.confirm{background:var(--accent);color:#000;border-color:var(--accent);}
 .sm-btn:active{transform:scale(0.95);}
 .sm-btn:disabled{opacity:0.35;cursor:default;}
 .inst-rec{
-  position:relative;font-size:9px;font-weight:700;
+  position:relative;font-size:10px;font-weight:700;
   letter-spacing:0.08em;text-transform:uppercase;
   color:var(--muted);cursor:pointer;border:1px solid var(--border);
-  border-radius:2px;padding:3px 6px;margin-top:1px;
+  border-radius:2px;padding:4px 8px;margin-top:1px;
   background:var(--s2);z-index:1;transition:all 0.12s;
+  touch-action:manipulation;
 }
 .inst-rec.sampled{color:var(--accent);border-color:var(--accent);}
+.inst-rec.live-recording{
+  color:#fff;
+  background:#e03030;
+  border-color:#e03030;
+  animation:pulse-rec-btn 0.5s ease-in-out infinite alternate;
+}
+@keyframes pulse-rec-btn{
+  from{box-shadow:0 0 0 0 rgba(224,48,48,0.6);}
+  to{box-shadow:0 0 0 5px rgba(224,48,48,0);}
+}
 .inst-rec:active{transform:scale(0.9);}
-
-/* ── COUNTDOWN OVERLAY ── */
-#countdown-overlay{
-  position:absolute;inset:0;
-  background:rgba(8,8,16,0.93);
-  display:none;
-  align-items:center;
-  justify-content:center;
-  flex-direction:column;
-  gap:10px;
-  z-index:10;
-  border-radius:10px;
-}
-#countdown-overlay.visible{display:flex;}
-#countdown-ring{
-  position:relative;
-  width:110px;height:110px;
-}
-#countdown-ring svg{
-  position:absolute;inset:0;
-  transform:rotate(-90deg);
-}
-#countdown-ring-track{
-  fill:none;stroke:var(--s3);stroke-width:5;
-}
-#countdown-ring-fill{
-  fill:none;stroke-width:5;
-  stroke-linecap:round;
-  transition:stroke-dashoffset 0.05s linear, stroke 0.3s;
-}
-#countdown-num{
-  position:absolute;inset:0;
-  display:flex;align-items:center;justify-content:center;
-  font-size:52px;font-weight:700;
-  font-family:'JetBrains Mono',monospace;
-  transition:transform 0.12s cubic-bezier(0.34,1.56,0.64,1), opacity 0.1s;
-}
-#countdown-num.pop{
-  animation:num-pop 0.35s cubic-bezier(0.34,1.56,0.64,1);
-}
-@keyframes num-pop{
-  0%{transform:scale(1.6);opacity:0}
-  60%{opacity:1}
-  100%{transform:scale(1);}
-}
-#countdown-label{
-  font-size:10px;letter-spacing:0.2em;text-transform:uppercase;
-  color:var(--muted);font-family:'JetBrains Mono',monospace;
-}
-#countdown-cancel{
-  font-size:9px;letter-spacing:0.12em;text-transform:uppercase;
-  color:var(--muted);font-family:'JetBrains Mono',monospace;
-  background:none;border:1px solid var(--border);border-radius:3px;
-  padding:4px 12px;cursor:pointer;margin-top:4px;
-  transition:color 0.12s, border-color 0.12s;
-}
-#countdown-cancel:hover{color:var(--text);border-color:var(--muted);}
-
-/* ── HOLD RING (hold-to-record visual) ── */
-#hold-ring-wrap{
+#sm-rec-tint{
+  position:absolute;top:0;bottom:0;left:50%;
+  width:50%;
+  background:rgba(0,229,200,0.04);
   pointer-events:none;
-  position:fixed;
-  display:none;
-  align-items:center;justify-content:center;
-  z-index:99999;
-  top:0;left:0;
 }
-#hold-ring-wrap.visible{display:flex;}
-#hold-ring-svg{overflow:visible;}
-#hold-arc{
-  fill:none;stroke:var(--accent);stroke-width:5;
-  stroke-linecap:round;
-  transform-origin:center;
-  transform:rotate(-90deg);
-  transition:none;
+#sm-center-line{
+  position:absolute;top:0;bottom:0;left:50%;
+  width:2px;margin-left:-1px;
+  background:rgba(0,229,200,0.35);
+  pointer-events:none;
 }
+#sm-playhead{
+  position:absolute;top:0;bottom:0;left:0;
+  width:2px;
+  background:rgba(255,255,255,0.7);
+  box-shadow:0 0 6px rgba(255,255,255,0.4);
+  pointer-events:none;
+  transition:background 0.2s;
+}
+#sm-playhead.in-rec{
+  background:#e03030;
+  box-shadow:0 0 8px rgba(224,48,48,0.6);
+}
+#sm-label-pre, #sm-label-rec{
+  position:absolute;top:5px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:8px;font-weight:700;letter-spacing:0.14em;
+  text-transform:uppercase;pointer-events:none;
+  opacity:0.5;
+}
+#sm-label-pre{ left:8px; color:var(--muted); }
+#sm-label-rec{ left:calc(50% + 8px); color:var(--accent); }
 </style>
 </head>
 <body>
@@ -576,11 +589,22 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
 
   <!-- TOP BAR -->
   <div id="topbar">
-    <span class="logo">RKTR <span>drum synth</span></span>
+    <button class="tbn" id="fs-btn" title="Fullscreen">⛶</button>
+    <span class="logo">RKTR</span>
     <div class="topbar-group">
       <span class="topbar-label">BPM</span>
-      <input type="range" id="bpm-slider" min="60" max="200" value="120" step="1">
+      <input type="range" id="bpm-slider" min="60" max="200" value="120" step="1" class="top-slider">
       <span id="bpm-display">120</span>
+    </div>
+    <div class="topbar-group">
+      <span class="topbar-label">SWING</span>
+      <input type="range" id="swing-slider" min="0" max="0.15" step="0.005" value="0" class="top-slider">
+      <span id="swing-val">0%</span>
+    </div>
+    <div class="topbar-group">
+      <select id="scene-select" style="background:var(--s2);border:1px solid var(--border);color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:9px;padding:3px 4px;border-radius:3px;cursor:pointer;max-width:72px;">
+        <option value="">scene</option>
+      </select>
     </div>
     <div class="topbar-group">
       <span class="topbar-label">STEPS</span>
@@ -589,27 +613,25 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
       <button class="step-btn" data-steps="32">32</button>
     </div>
     <div class="spacer"></div>
+    <button class="tbn warn" id="clear-btn">CLR<div id="clr-fill"></div></button>
     <button class="tbn active" id="play-btn">▶ PLAY</button>
-    <button class="tbn" id="menu-btn">☰</button>
-    <button class="tbn" id="fs-btn" title="Fullscreen">⛶</button>
-  </div>
-
-  <!-- COLLAPSIBLE MENU -->
-  <div id="menu-panel">
-    <div id="menu-inner">
-      <div class="topbar-group">
-        <span class="topbar-label">SWING</span>
-        <input type="range" id="swing-slider" min="0" max="0.15" step="0.005" value="0" style="width:60px;accent-color:var(--accent);">
-        <span id="swing-val">0%</span>
+    <div id="gear-wrap">
+      <button class="tbn" id="gear-btn" title="Settings">⚙</button>
+      <div id="gear-menu">
+        <div class="gear-item" id="glow-item">
+          <span>Glow</span>
+          <div class="gear-toggle active" id="glow-toggle"></div>
+        </div>
+        <div class="gear-divider"></div>
+        <div class="gear-item" id="save-preset-item">
+          <span>Save preset…</span>
+          <span style="font-size:10px;color:var(--muted);">＋</span>
+        </div>
+        <div class="gear-item" id="clear-samples-item">
+          <span>Clear samples</span>
+          <span style="font-size:10px;color:var(--muted);">⏺</span>
+        </div>
       </div>
-      <div class="topbar-group">
-        <span class="topbar-label">SCENE</span>
-        <select id="scene-select" style="background:var(--s2);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 6px;border-radius:3px;cursor:pointer;">
-          <option value="">— pick —</option>
-        </select>
-      </div>
-      <button class="tbn" id="quant-btn">QUANT OFF</button>
-      <button class="tbn warn" id="clear-btn">CLR</button>
     </div>
   </div>
 
@@ -619,59 +641,38 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   <!-- SAMPLE MODAL -->
   <div id="sample-modal">
     <div id="sample-box">
-      <!-- Countdown overlay (inside modal box) -->
-      <div id="countdown-overlay">
-        <div id="countdown-ring">
-          <svg viewBox="0 0 110 110" width="110" height="110">
-            <circle id="countdown-ring-track" cx="55" cy="55" r="48"/>
-            <circle id="countdown-ring-fill" cx="55" cy="55" r="48"/>
-          </svg>
-          <div id="countdown-num">3</div>
-        </div>
-        <div id="countdown-label">GET READY</div>
-        <button id="countdown-cancel">CANCEL</button>
-      </div>
-
       <div class="sm-title" id="sm-title">Sample — KICK</div>
       <div class="sm-lengths">
+        <button class="sm-len active" data-beats="1">1 step</button>
+        <button class="sm-len" data-beats="2">2 steps</button>
         <button class="sm-len" data-beats="4">1 beat</button>
-        <button class="sm-len active" data-beats="8">2 beats</button>
+        <button class="sm-len" data-beats="8">2 beats</button>
         <button class="sm-len" data-beats="16">1 bar</button>
-        <button class="sm-len" data-beats="32">2 bars</button>
-        <button class="sm-len" data-beats="64">4 bars</button>
       </div>
-      <!-- Mode toggle -->
+      <!-- Scrolling waveform canvas — taller, full-width -->
+      <div id="sm-canvas-wrap" style="position:relative;width:100%;border-radius:6px;overflow:hidden;border:1px solid var(--border);background:#18182a;">
+        <canvas id="sample-canvas" style="width:100%;height:110px;display:block;"></canvas>
+        <!-- rec zone tint overlay (right half, pointer-events:none) -->
+        <div id="sm-rec-tint"></div>
+        <!-- center divider line -->
+        <div id="sm-center-line"></div>
+        <!-- playhead -->
+        <div id="sm-playhead"></div>
+        <!-- labels -->
+        <div id="sm-label-pre">PRE-ROLL</div>
+        <div id="sm-label-rec">● REC</div>
+      </div>
+      <!-- status row -->
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:9px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;flex-shrink:0;">MODE</span>
-        <div id="rec-mode-toggle">
-          <button class="rec-mode-btn active" data-mode="tap">TAP</button>
-          <button class="rec-mode-btn" data-mode="hold">HOLD</button>
-        </div>
-        <span id="rec-mode-hint" style="font-size:8px;color:var(--muted);letter-spacing:0.06em;flex:1;text-align:right;">tap to start/stop</span>
+        <div id="sample-timer" style="flex:1;font-size:15px;font-weight:700;color:var(--muted);font-family:'JetBrains Mono',monospace;min-height:22px;letter-spacing:0.06em;"></div>
       </div>
-      <div class="sm-canvas-wrap" id="sm-canvas-wrap" style="position:relative;width:100%;border-radius:4px;overflow:hidden;border:1px solid var(--border);background:#18182a;">
-        <canvas id="sample-canvas" style="width:100%;height:80px;display:block;"></canvas>
-        <div id="sample-progress-bar" style="position:absolute;bottom:0;left:0;height:3px;background:var(--accent);width:0%;"></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div id="sample-timer" style="flex:1;text-align:left;font-size:18px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace;min-height:24px;"></div>
-        <button class="sm-btn" id="sm-play" disabled style="flex:0;padding:6px 14px;">▶ Play</button>
-      </div>
-      <button id="sample-rec-btn">⏺ Record</button>
-      <div class="sm-actions">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button id="sample-rec-btn">⏺ Start</button>
+        <button class="sm-btn" id="sm-play" disabled>▶ Play</button>
         <button class="sm-btn" id="sm-cancel">Cancel</button>
         <button class="sm-btn confirm" id="sm-confirm" disabled>Use Sample</button>
       </div>
     </div>
-  </div>
-
-  <!-- Hold-ring overlay (full viewport, pointer-events:none) -->
-  <div id="hold-ring-wrap">
-    <svg id="hold-ring-svg" width="120" height="120" viewBox="0 0 120 120">
-      <circle cx="60" cy="60" r="52" fill="none" stroke="#22223a" stroke-width="6"/>
-      <circle id="hold-arc" cx="60" cy="60" r="52" fill="none" stroke-width="6"
-        stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
-    </svg>
   </div>
 
   <!-- BANDS -->
@@ -695,6 +696,19 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
     <div id="synth-inner"></div>
   </div>
 
+  <!-- INLINE PROMPT (replaces window.prompt for Android compatibility) -->
+  <div id="inline-prompt" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;align-items:center;justify-content:center;">
+    <div style="background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:20px;width:min(300px,88vw);display:flex;flex-direction:column;gap:12px;">
+      <div id="inline-prompt-label" style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text);"></div>
+      <input id="inline-prompt-input" type="text" autocomplete="off" autocorrect="off" spellcheck="false"
+        style="background:var(--s2);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:14px;padding:10px 12px;border-radius:6px;outline:none;width:100%;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button id="inline-prompt-cancel" class="sm-btn">Cancel</button>
+        <button id="inline-prompt-ok" class="sm-btn confirm">Save</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -714,6 +728,7 @@ let steps = 16;
 let isPlaying = false;
 let quantOn = false;
 let swing = 0;
+let glowOn = true;
 let currentPos = 0;  // in full steps, advances by 0.5
 let nextStepTime = 0;
 let timerID = null;
@@ -1015,7 +1030,6 @@ function scheduleStep(step, t) {
 function scheduler() {
   while (nextStepTime < AC.currentTime + LOOKAHEAD) {
     scheduleStep(currentPos, nextStepTime);
-    updatePlayhead(currentPos);
     currentPos = (currentPos + 1) % steps;
     nextStepTime += stepDur();
   }
@@ -1025,30 +1039,37 @@ function scheduler() {
 function startSeq() {
   resumeAC();
   currentPos = 0;
-  nextStepTime = AC.currentTime + 0.05;
+  seqStartTime = AC.currentTime + 0.05;
+  nextStepTime = seqStartTime;
   scheduler();
+  visualRaf = requestAnimationFrame(visualTick);
 }
 
 function stopSeq() {
   clearTimeout(timerID);
   timerID = null;
-  updatePlayhead(-1);
+  cancelAnimationFrame(visualRaf);
+  visualRaf = null;
+  lastRenderedStep = -1;
   renderAll();
 }
 
+let seqStartTime = 0;
+let visualRaf = null;
 let lastRenderedStep = -1;
-function updatePlayhead(step) {
-  if (step === lastRenderedStep) return;
-  lastRenderedStep = step;
-  const sc = document.getElementById('step-cursor');
-  if (step >= 0) {
+
+function visualTick() {
+  if (!isPlaying) return;
+  const elapsed = AC.currentTime - seqStartTime;
+  const step = Math.floor(elapsed / stepDur()) % steps;
+  if (step !== lastRenderedStep) {
+    lastRenderedStep = step;
+    renderAll();
+    const sc = document.getElementById('step-cursor');
     sc.style.left = (step / steps * 100) + '%';
     sc.style.width = (1 / steps * 100) + '%';
-  } else {
-    sc.style.left = '0';
-    currentPos = 0;
   }
-  renderAll();
+  visualRaf = requestAnimationFrame(visualTick);
 }
 
 // ─── Canvas Rendering ─────────────────────────────────────────────
@@ -1102,15 +1123,7 @@ function renderBand(instId) {
   cx.beginPath(); cx.moveTo(0, h * 0.5); cx.lineTo(w, h * 0.5); cx.stroke();
   cx.setLineDash([]);
 
-  // Playhead highlight
-  if (isPlaying && lastRenderedStep >= 0) {
-    const px = lastRenderedStep * stepW;
-    cx.fillStyle = 'rgba(0,229,200,0.06)';
-    cx.fillRect(px, 0, stepW, h);
-    cx.strokeStyle = 'rgba(0,229,200,0.35)';
-    cx.lineWidth = 1;
-    cx.beginPath(); cx.moveTo(px, 0); cx.lineTo(px, h); cx.stroke();
-  }
+  // Playhead — drawn later, on top of everything
 
   // Notes — merge actual notes with any active resize preview
   const ds = drawSt[instId];
@@ -1214,6 +1227,28 @@ function renderBand(instId) {
     cx.textAlign = 'center';
     cx.textBaseline = 'middle';
     cx.fillText('MUTED', w / 2, h / 2);
+  }
+
+  // Playhead — on top of everything
+  if (isPlaying && lastRenderedStep >= 0) {
+    const px = lastRenderedStep * stepW;
+    cx.globalAlpha = 1;
+    if (glowOn) {
+      // Glow mode: tinted step fill + glowing line
+      cx.fillStyle = 'rgba(0,229,200,0.12)';
+      cx.fillRect(px, 0, stepW, h);
+      cx.strokeStyle = '#00e5c8';
+      cx.lineWidth = 2;
+      cx.shadowColor = '#00e5c8';
+      cx.shadowBlur = 8;
+      cx.beginPath(); cx.moveTo(px + 1, 0); cx.lineTo(px + 1, h); cx.stroke();
+      cx.shadowBlur = 0;
+    } else {
+      // Clean mode: just a crisp line
+      cx.strokeStyle = '#00e5c8';
+      cx.lineWidth = 1.5;
+      cx.beginPath(); cx.moveTo(px + 1, 0); cx.lineTo(px + 1, h); cx.stroke();
+    }
   }
 }
 
@@ -1525,7 +1560,7 @@ function setupBandEvents(instId, canvas) {
 }
 
 // ─── Build DOM ────────────────────────────────────────────────────
-const instVol = { kick:1, snare:1, hihat:1, tom:1 };
+const instVol = { kick:0.9, snare:0.9, hihat:0.9, tom:0.9 };
 const instYParam = { kick:null, snare:null, hihat:null, tom:null }; // null = volume
 
 function updateVolFill(instId) {
@@ -1574,10 +1609,7 @@ function showYParamPicker(instId, anchorEl) {
 }
 
 function updateMuteBtn(instId) {
-  const muteBtn = document.getElementById('mute-' + instId);
   const yInd = document.getElementById('yparam-ind-' + instId);
-  if (!muteBtn) return;
-  muteBtn.classList.toggle('muted', muted[instId]);
   if (yInd) {
     const param = instYParam[instId];
     if (param && param !== 'none') {
@@ -1615,50 +1647,57 @@ function buildBands() {
       <span class="inst-name">${inst.name}</span>
       <span class="inst-yparam" id="yparam-ind-${inst.id}" style="display:${instYParam[inst.id] && instYParam[inst.id]!=='none' ? 'block' : 'none'};color:${inst.color}">${instYParam[inst.id] && instYParam[inst.id]!=='none' ? instYParam[inst.id].toUpperCase() : ''}</span>
       <span class="inst-rec${instSamples[inst.id] ? ' sampled' : ''}" id="rec-${inst.id}">⏺</span>
-      <span class="inst-mute${muted[inst.id] ? ' muted' : ''}" id="mute-${inst.id}">M</span>
     `;
 
-    // Mute button: tap only
-    const muteBtn = lbl.querySelector('.inst-mute');
-    muteBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
-    muteBtn.addEventListener('pointerup', (e) => {
-      e.stopPropagation();
-      muted[inst.id] = !muted[inst.id];
-      muteBtn.classList.toggle('muted', muted[inst.id]);
-      renderBand(inst.id);
-    });
-
-    // REC button: tap to open sample modal, hold to clear sample
+    // REC button: tap → modal, hold → live record (release to stop)
     const recBtn = lbl.querySelector('.inst-rec');
     recBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    recBtn.addEventListener('pointermove', (e) => e.stopPropagation());
+
     let recHoldTimer = null;
+    let recLiveActive = false;
+
     recBtn.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
+      recBtn.setPointerCapture(e.pointerId);
+      recLiveActive = false;
       recHoldTimer = setTimeout(() => {
         recHoldTimer = null;
-        if (instSamples[inst.id]) {
-          instSamples[inst.id] = null;
-          recBtn.classList.remove('sampled');
-        }
-      }, 600);
+        recLiveActive = true;
+        startLiveRecord(inst.id, recBtn);
+      }, 300);
     });
+
     recBtn.addEventListener('pointerup', (e) => {
       e.stopPropagation();
       if (recHoldTimer !== null) {
+        // Short tap — open modal
         clearTimeout(recHoldTimer); recHoldTimer = null;
         openSampleModal(inst.id);
+      } else if (recLiveActive) {
+        // Was holding — stop live recording
+        recLiveActive = false;
+        stopLiveRecord(inst.id, recBtn);
       }
     });
-    recBtn.addEventListener('pointercancel', () => { clearTimeout(recHoldTimer); recHoldTimer = null; });
 
+    recBtn.addEventListener('pointercancel', (e) => {
+      clearTimeout(recHoldTimer); recHoldTimer = null;
+      if (recLiveActive) { recLiveActive = false; stopLiveRecord(inst.id, recBtn); }
+    });
+
+    // Volume drag + swipe-to-mute
+    // Swipe down past threshold → mute (vol→0), swipe back up → restore
     let holdTimer = null;
     let pointerStartY = 0;
-    let volStartVal = 1;
+    let volStartVal = 0.9;
     let didHold = false;
     let isDragging = false;
+    let mutedBySwipe = false;
+    let premuteVol = 0.9;
 
     lbl.addEventListener('pointerdown', (e) => {
-      if (e.target === muteBtn) return;
+      if (e.target === recBtn) return;
       pointerStartY = e.clientY;
       volStartVal = instVol[inst.id];
       didHold = false;
@@ -1672,45 +1711,61 @@ function buildBands() {
     });
 
     lbl.addEventListener('pointermove', (e) => {
-      if (e.target === muteBtn || (!isDragging && holdTimer === null && !didHold)) return;
+      if (e.target === recBtn || (!isDragging && holdTimer === null && !didHold)) return;
       const dy = e.clientY - pointerStartY;
-      if (!isDragging && Math.abs(dy) > 8) {
+      if (!isDragging && Math.abs(dy) > 6) {
         isDragging = true;
         clearTimeout(holdTimer); holdTimer = null;
       }
       if (isDragging) {
-        instVol[inst.id] = Math.max(0, Math.min(1, volStartVal - dy / lbl.offsetHeight * 1.5));
+        // More responsive: 2× sensitivity, full range in half the label height
+        const newVol = Math.max(0, Math.min(1, volStartVal - dy / (lbl.offsetHeight * 1.0)));
+        instVol[inst.id] = newVol;
         updateVolFill(inst.id);
+        // Mute indicator: if dragged to 0, mark as muted
+        muted[inst.id] = newVol === 0;
+        lbl.classList.toggle('muted-swipe', muted[inst.id]);
       }
     });
 
     lbl.addEventListener('pointerup', (e) => {
-      if (e.target === muteBtn) return;
+      if (e.target === recBtn) return;
       if (holdTimer !== null) {
         clearTimeout(holdTimer); holdTimer = null;
         if (!isDragging) {
-          // Clean tap
-          if (instYParam[inst.id] !== null) {
-          const ns = notes[inst.id] || [];
-          const allOn  = ns.length > 0 && ns.every(n => n.entangled);
-          const allOff = ns.every(n => !n.entangled);
-          const hasSaved = instEntangleSaved[inst.id] !== null;
-
-          if (allOff) {
-            instEntangleSaved[inst.id] = ns.map(n => n.entangled);
-            ns.forEach(n => { n.entangled = true; });
-          } else if (allOn && hasSaved) {
-            const saved = instEntangleSaved[inst.id];
-            ns.forEach((n, i) => { n.entangled = saved[i] ?? false; });
+          // Clean tap — toggle mute, restore vol if un-muting
+          if (muted[inst.id]) {
+            muted[inst.id] = false;
+            instVol[inst.id] = premuteVol || 0.9;
+            lbl.classList.remove('muted-swipe');
+            updateVolFill(inst.id);
           } else {
-            instEntangleSaved[inst.id] = ns.map(n => n.entangled);
-            ns.forEach(n => { n.entangled = false; });
+            premuteVol = instVol[inst.id];
+            muted[inst.id] = true;
+            instVol[inst.id] = 0;
+            lbl.classList.add('muted-swipe');
+            updateVolFill(inst.id);
           }
-          renderBand(inst.id);
-        } else {
-          selectInst(inst.id);
+          if (instYParam[inst.id] !== null) {
+            const ns = notes[inst.id] || [];
+            const allOn  = ns.length > 0 && ns.every(n => n.entangled);
+            const allOff = ns.every(n => !n.entangled);
+            const hasSaved = instEntangleSaved[inst.id] !== null;
+            if (allOff) {
+              instEntangleSaved[inst.id] = ns.map(n => n.entangled);
+              ns.forEach(n => { n.entangled = true; });
+            } else if (allOn && hasSaved) {
+              const saved = instEntangleSaved[inst.id];
+              ns.forEach((n, i) => { n.entangled = saved[i] ?? false; });
+            } else {
+              instEntangleSaved[inst.id] = ns.map(n => n.entangled);
+              ns.forEach(n => { n.entangled = false; });
+            }
+            renderBand(inst.id);
+          } else {
+            selectInst(inst.id);
+          }
         }
-      } // end !isDragging
       }
       isDragging = false;
       didHold = false;
@@ -2006,20 +2061,106 @@ function loadScene(scene) {
   // Re-render
   renderSynthPanel();
   renderAll();
-  // Reset step cursor display
-  document.getElementById('scene-select').value = '';
+  // Leave scene-select showing the loaded preset name (don't reset to '')
 }
 
-// ─── Sample Modal ─────────────────────────────────────────────────
+// ─── Live Hold-to-Record ──────────────────────────────────────────
+const liveRec = {}; // per-instId state
+
+async function startLiveRecord(instId, btn) {
+  if (liveRec[instId]?.active) return;
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  } catch(e) {
+    return;
+  }
+
+  const chunks = [];
+  const mr = new MediaRecorder(stream, (() => {
+    const preferred = ['audio/ogg;codecs=opus','audio/webm;codecs=opus','audio/webm','audio/ogg'];
+    const mime = preferred.find(t => MediaRecorder.isTypeSupported(t)) || '';
+    return mime ? { mimeType: mime } : {};
+  })());
+  mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+  mr.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop());
+    btn.classList.remove('live-recording');
+    try {
+      const mimeType = mr.mimeType || '';
+      const blob = new Blob(chunks, mimeType ? { type: mimeType } : {});
+      const arrayBuf = await blob.arrayBuffer();
+      const tryDecode = (ctx) => new Promise((res, rej) => ctx.decodeAudioData(arrayBuf.slice(0), res, rej));
+      let decoded;
+      try { decoded = await tryDecode(AC); }
+      catch(e1) {
+        const ac2 = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+        decoded = await tryDecode(ac2);
+        ac2.close();
+      }
+      instSamples[instId] = decoded;
+      instSampleBeats[instId] = Math.max(1, Math.round(decoded.duration / stepDur()));
+      btn.classList.add('sampled');
+    } catch(err) {
+      console.error('Live rec decode failed', err);
+    }
+    liveRec[instId] = null;
+  };
+
+  // Snap start to next step boundary if sequencer is running
+  const delayMs = isPlaying
+    ? Math.max(0, (nextStepTime - AC.currentTime) * 1000)
+    : 0;
+
+  liveRec[instId] = { active: true, mr, stream };
+  btn.classList.add('live-recording');
+
+  setTimeout(() => {
+    if (liveRec[instId]?.active) mr.start(50);
+  }, delayMs);
+}
+
+function stopLiveRecord(instId, btn) {
+  const state = liveRec[instId];
+  if (!state?.active) return;
+  state.active = false;
+  if (state.mr.state !== 'inactive') state.mr.stop();
+}
+
+// ─── Sample Modal — Scrolling Tape Recorder ───────────────────────
 let sampleInstId = null;
-let sampleBeats = 8;
-let mediaStream = null;
+let sampleBeats  = 1;
+let mediaStream  = null;
 let mediaRecorder = null;
-let recChunks = [];
+let recChunks    = [];
 let pendingBuffer = null;
-let recTimerHandle = null;
-let recAnimHandle = null;
-let analyserNode = null;
+let analyserNode  = null;
+
+// Tape state
+let tapeActive   = false;
+let tapeRecording = false;
+let tapeRAF      = null;
+let tapeSamples  = [];
+let tapePos      = 0;
+let tapeCanvasW  = 300;
+let tapeCanvasH  = 110;
+let tapeSecs     = 0;
+let tapeRecSecs  = 0;
+let tapePrerollFrac = 0.5;  // fraction of canvas width that is pre-roll
+let tapeStartTime = 0;
+let tapeRecStartTime = 0;
+
+function getTapeCanvas() {
+  const cv = document.getElementById('sample-canvas');
+  const wrap = cv.parentElement;
+  const w = wrap.offsetWidth || 300;
+  const h = 110;
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  tapeCanvasW = cv.width;
+  tapeCanvasH = cv.height;
+  return cv;
+}
 
 function openSampleModal(instId) {
   resumeAC();
@@ -2029,88 +2170,244 @@ function openSampleModal(instId) {
   const inst = INSTRUMENTS.find(i => i.id === instId);
   document.getElementById('sm-title').textContent = `Sample — ${inst.name}`;
   document.getElementById('sm-title').style.color = inst.color;
-  const recBtnEl = document.getElementById('sample-rec-btn');
-  recBtnEl.textContent = recMode === 'hold' ? '⏺ Hold to Record' : '⏺ Record';
-  recBtnEl.classList.remove('recording');
-  recBtnEl.disabled = false;
+  const btn = document.getElementById('sample-rec-btn');
+  btn.textContent = '⏺ Start';
+  btn.className = '';
+  btn.disabled = false;
   document.getElementById('sample-timer').textContent = '';
+  document.getElementById('sample-timer').style.color = 'var(--muted)';
   document.getElementById('sm-confirm').disabled = true;
   document.getElementById('sm-play').disabled = true;
-  const bar = document.getElementById('sample-progress-bar');
-  if (bar) bar.style.width = '0%';
   document.querySelectorAll('.sm-len').forEach(b => b.classList.toggle('active', +b.dataset.beats === sampleBeats));
-  clearWaveform();
   document.getElementById('sample-modal').classList.add('visible');
-  // Prefetch mic immediately so Android has no permission delay later
-  prefetchMic();
-  // Let layout settle then size canvas and clear it
+  // Size canvas after layout settles, then position overlays
   setTimeout(() => {
-    const cv = getCanvas();
+    const cv = getTapeCanvas();
     const cx = cv.getContext('2d');
     cx.fillStyle = '#18182a';
     cx.fillRect(0, 0, cv.width, cv.height);
-  }, 30);
+    // preroll = 2 quarter notes, rec = sampleBeats 16th notes
+    const stepSec = 60 / bpm / 4;
+    const prerollSecs = 2 * (60 / bpm);
+    const recSecs = sampleBeats * stepSec;
+    const frac = prerollSecs / (prerollSecs + recSecs);
+    const midX = Math.round(cv.width * frac);
+    document.getElementById('sm-center-line').style.left = midX + 'px';
+    document.getElementById('sm-rec-tint').style.left = midX + 'px';
+    document.getElementById('sm-rec-tint').style.width = (cv.width - midX) + 'px';
+    document.getElementById('sm-rec-tint').style.right = 'auto';
+    updatePlayhead(0, midX);
+  }, 40);
 }
 
 function closeSampleModal() {
-  countdownAbort = true;
-  stopRecording();
-  releasePrefetchedMic();
-  // Also stop any mic stream that might be open during countdown
+  stopTape();
   if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
   document.getElementById('sample-modal').classList.remove('visible');
-  document.getElementById('countdown-overlay').classList.remove('visible');
-  hideHoldRing();
   sampleInstId = null;
 }
 
-function clearWaveform() {
-  const cv = document.getElementById('sample-canvas');
-  const cx = cv.getContext('2d');
-  cv.width = cv.offsetWidth; cv.height = cv.offsetHeight;
-  cx.fillStyle = '#18182a';
-  cx.fillRect(0, 0, cv.width, cv.height);
+function updatePlayhead(xPx, midX) {
+  const ph = document.getElementById('sm-playhead');
+  const w = tapeCanvasW || 300;
+  const mid = midX !== undefined ? midX : w * tapePrerollFrac;
+  ph.style.left = Math.min(xPx, w - 2) + 'px';
+  const inRec = xPx >= mid;
+  ph.classList.toggle('in-rec', inRec);
 }
 
-function getCanvas() {
-  const cv = document.getElementById('sample-canvas');
-  const wrap = cv.parentElement;
-  const w = wrap.offsetWidth || 300;
-  const h = 80;
-  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
-  return cv;
+async function startTape() {
+  const btn = document.getElementById('sample-rec-btn');
+  btn.disabled = true;
+  btn.textContent = 'opening mic…';
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  } catch(err) {
+    btn.disabled = false;
+    btn.textContent = '⏺ Start';
+    alert('Microphone access denied.');
+    return;
+  }
+  mediaStream = stream;
+
+  // Set up analyser for live waveform
+  const srcNode = AC.createMediaStreamSource(mediaStream);
+  analyserNode = AC.createAnalyser();
+  analyserNode.fftSize = 256;
+  srcNode.connect(analyserNode);
+
+  // Tape config: pre-roll always 2 quarter-note beats, rec = selected length in 16th steps
+  const stepSec = 60 / bpm / 4;
+  const prerollSecs = 2 * (60 / bpm);
+  tapeRecSecs = sampleBeats * stepSec;
+  tapeSecs = prerollSecs + tapeRecSecs;
+
+  const cv = getTapeCanvas();
+  // midX is proportional: preroll takes prerollSecs/tapeSecs of canvas width
+  const prerollFrac = prerollSecs / tapeSecs;
+  tapeSamples = new Float32Array(cv.width).fill(0);
+  tapePos = 0;
+  tapeActive = true;
+  tapeRecording = false;
+  tapeStartTime = performance.now();
+  // Store preroll fraction for drawTapeLoop
+  tapePrerollFrac = prerollFrac;
+
+  btn.textContent = '● Pre-roll…';
+  btn.className = 'preroll';
+  btn.disabled = false;
+  document.getElementById('sample-timer').textContent = 'get ready…';
+  document.getElementById('sample-timer').style.color = 'var(--muted)';
+
+  // MediaRecorder — ready but not started yet
+  recChunks = [];
+  mediaRecorder = new MediaRecorder(mediaStream, (() => {
+    const preferred = ['audio/ogg;codecs=opus','audio/webm;codecs=opus','audio/webm','audio/ogg'];
+    const mime = preferred.find(t => MediaRecorder.isTypeSupported(t)) || '';
+    return mime ? { mimeType: mime } : {};
+  })());
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
+  mediaRecorder.onstop = async () => {
+    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+    const timerEl = document.getElementById('sample-timer');
+    timerEl.textContent = 'decoding…';
+    timerEl.style.color = 'var(--muted)';
+    try {
+      const mimeType = mediaRecorder.mimeType || '';
+      const blob = new Blob(recChunks, mimeType ? { type: mimeType } : {});
+      const arrayBuf = await blob.arrayBuffer();
+      let decoded = null;
+      const tryDecode = (ctx) => new Promise((res, rej) => ctx.decodeAudioData(arrayBuf.slice(0), res, rej));
+      try { decoded = await tryDecode(AC); }
+      catch(e1) {
+        try {
+          const ac2 = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+          decoded = await tryDecode(ac2);
+          ac2.close();
+        } catch(e2) { throw e2; }
+      }
+      pendingBuffer = decoded;
+      drawBufferWaveform(pendingBuffer);
+      document.getElementById('sm-confirm').disabled = false;
+      document.getElementById('sm-play').disabled = false;
+      timerEl.textContent = pendingBuffer.duration.toFixed(2) + 's recorded';
+      timerEl.style.color = 'var(--accent)';
+      const btn2 = document.getElementById('sample-rec-btn');
+      btn2.textContent = '⏺ Re-record';
+      btn2.className = '';
+      btn2.disabled = false;
+    } catch(err) {
+      document.getElementById('sample-timer').textContent = 'decode error :(';
+      console.error('decode failed', err);
+      const btn2 = document.getElementById('sample-rec-btn');
+      btn2.textContent = '⏺ Retry';
+      btn2.className = '';
+      btn2.disabled = false;
+    }
+  };
+
+  drawTapeLoop();
 }
 
-function drawLiveWaveform() {
-  if (!analyserNode) return;
-  const cv = getCanvas();
+function drawTapeLoop() {
+  if (!tapeActive) return;
+  const cv = getTapeCanvas();
   const cx = cv.getContext('2d');
   const w = cv.width, h = cv.height;
-  const buf = new Uint8Array(analyserNode.frequencyBinCount);
-  analyserNode.getByteTimeDomainData(buf);
+  const midX = Math.round(w * tapePrerollFrac);
+  const elapsed = (performance.now() - tapeStartTime) / 1000;
+  const progress = Math.min(elapsed / tapeSecs, 1.0);
+  const xPx = progress * w;
+
+  // Sample current amplitude
+  const freqBuf = new Uint8Array(analyserNode.frequencyBinCount);
+  analyserNode.getByteTimeDomainData(freqBuf);
+  let peak = 0;
+  for (let i = 0; i < freqBuf.length; i++) {
+    const v = Math.abs(freqBuf[i] / 128 - 1);
+    if (v > peak) peak = v;
+  }
+  tapeSamples[Math.floor(xPx)] = peak;
+
+  // Start MediaRecorder exactly when playhead crosses the preroll boundary
+  if (!tapeRecording && xPx >= midX) {
+    tapeRecording = true;
+    tapeRecStartTime = performance.now();
+    mediaRecorder.start(100);
+    const btn = document.getElementById('sample-rec-btn');
+    btn.textContent = '⏹ Stop';
+    btn.className = 'recording';
+    document.getElementById('sample-timer').style.color = '#e03030';
+    // Update center line position to match actual midX
+    document.getElementById('sm-center-line').style.left = midX + 'px';
+    document.getElementById('sm-rec-tint').style.left = midX + 'px';
+    document.getElementById('sm-rec-tint').style.width = (w - midX) + 'px';
+  }
+
+  // Update timer display
+  const timerEl = document.getElementById('sample-timer');
+  if (tapeRecording) {
+    const recElapsed = (performance.now() - tapeRecStartTime) / 1000;
+    const remaining = Math.max(0, tapeRecSecs - recElapsed);
+    timerEl.textContent = remaining.toFixed(1) + 's';
+    timerEl.style.color = remaining < 1 ? '#ff6060' : '#e03030';
+  }
+
+  // Draw canvas
   cx.fillStyle = '#18182a';
   cx.fillRect(0, 0, w, h);
-  cx.strokeStyle = '#00e5c8';
-  cx.lineWidth = 1.5;
-  cx.beginPath();
-  for (let i = 0; i < buf.length; i++) {
-    const x = (i / buf.length) * w;
-    const y = ((buf[i] / 128) - 1) * (h / 2) + h / 2;
-    i === 0 ? cx.moveTo(x, y) : cx.lineTo(x, y);
+
+  // Draw waveform columns
+  for (let i = 0; i < Math.floor(xPx); i++) {
+    const amp = tapeSamples[i] || 0;
+    const barH = Math.max(2, amp * (h - 8));
+    const inRec = i >= midX;
+    cx.fillStyle = inRec ? 'rgba(0,229,200,0.75)' : 'rgba(100,100,140,0.5)';
+    cx.fillRect(i, (h - barH) / 2, 1, barH);
   }
-  cx.stroke();
-  recAnimHandle = requestAnimationFrame(drawLiveWaveform);
+
+  // Fade undrawn future zone
+  cx.fillStyle = 'rgba(24,24,42,0.55)';
+  cx.fillRect(Math.floor(xPx), 0, w - Math.floor(xPx), h);
+
+  updatePlayhead(xPx, midX);
+
+  if (progress >= 1.0) {
+    stopTape();
+    return;
+  }
+
+  tapeRAF = requestAnimationFrame(drawTapeLoop);
+}
+
+function stopTape() {
+  tapeActive = false;
+  cancelAnimationFrame(tapeRAF);
+  analyserNode = null;
+  if (tapeRecording) {
+    tapeRecording = false;
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  } else {
+    // Stopped before rec started — clean up
+    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+    const btn = document.getElementById('sample-rec-btn');
+    btn.textContent = '⏺ Start';
+    btn.className = '';
+    btn.disabled = false;
+  }
 }
 
 function drawBufferWaveform(audioBuf) {
-  const cv = getCanvas();
+  const cv = getTapeCanvas();
   const cx = cv.getContext('2d');
   const w = cv.width, h = cv.height;
   const data = audioBuf.getChannelData(0);
   const step = Math.max(1, Math.floor(data.length / w));
   cx.fillStyle = '#18182a';
   cx.fillRect(0, 0, w, h);
-  cx.strokeStyle = '#00e5c8';
+  cx.strokeStyle = 'var(--accent)';
   cx.lineWidth = 1;
   cx.beginPath();
   for (let i = 0; i < w; i++) {
@@ -2124,354 +2421,18 @@ function drawBufferWaveform(audioBuf) {
     cx.lineTo(i, (1 + max) * h / 2);
   }
   cx.stroke();
-  // Reset progress bar
-  const bar = document.getElementById('sample-progress-bar');
-  if (bar) bar.style.width = '0%';
+  // Hide playhead after done
+  document.getElementById('sm-playhead').style.display = 'none';
 }
 
-// ─── Recording — improved ─────────────────────────────────────────
-let recMode = 'tap';          // 'tap' | 'hold'
-let countdownAbort = false;   // cancels the countdown
-let prefetchedStream = null;  // mic stream grabbed on modal open
-let holdRafHandle = null;
-let holdStartTime = 0;
-
-// ── Mic pre-fetch (called when modal opens) ──
-async function prefetchMic() {
-  if (prefetchedStream) return; // already have it
-  try {
-    prefetchedStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    // Suspend immediately — we'll use it when recording starts
-    // Keep it alive but silent
-  } catch(_) {
-    prefetchedStream = null; // will fall back to requesting on demand
+document.getElementById('sample-rec-btn').addEventListener('click', () => {
+  if (tapeActive) {
+    stopTape();
+  } else {
+    // Reset playhead visibility
+    document.getElementById('sm-playhead').style.display = '';
+    startTape();
   }
-}
-
-async function acquireMic() {
-  if (prefetchedStream && prefetchedStream.active) {
-    const s = prefetchedStream;
-    prefetchedStream = null; // hand off ownership
-    return s;
-  }
-  return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-}
-
-function releasePrefetchedMic() {
-  if (prefetchedStream) {
-    prefetchedStream.getTracks().forEach(t => t.stop());
-    prefetchedStream = null;
-  }
-}
-
-// ── Countdown ring ──
-const CIRC = 2 * Math.PI * 48; // matches r="48" in SVG
-function showCountdown(onGo, onCancel) {
-  countdownAbort = false;
-  const overlay  = document.getElementById('countdown-overlay');
-  const numEl    = document.getElementById('countdown-num');
-  const ringFill = document.getElementById('countdown-ring-fill');
-  const cancelBtn= document.getElementById('countdown-cancel');
-  const label    = document.getElementById('countdown-label');
-
-  const counts = [3, 2, 1];
-  const colors = ['#ff5e2a','#ffe040','#00e5c8'];
-
-  overlay.classList.add('visible');
-  label.textContent = 'GET READY';
-
-  let step = 0;
-  const STEP_MS = 700;
-
-  // Circumference of ring
-  ringFill.style.strokeDasharray  = CIRC;
-  ringFill.style.strokeDashoffset = 0;
-
-  function tick() {
-    if (countdownAbort) { cleanup(); onCancel(); return; }
-    if (step >= counts.length) {
-      // GO!
-      numEl.style.color = '#00e5c8';
-      numEl.textContent = '●';
-      label.textContent = 'REC';
-      ringFill.style.stroke = '#e03030';
-      ringFill.style.strokeDashoffset = 0;
-      numEl.classList.remove('pop');
-      void numEl.offsetWidth;
-      numEl.classList.add('pop');
-      setTimeout(() => { cleanup(); onGo(); }, 120);
-      return;
-    }
-    const n = counts[step];
-    numEl.style.color = colors[step];
-    ringFill.style.stroke = colors[step];
-    numEl.textContent = n;
-    numEl.classList.remove('pop');
-    void numEl.offsetWidth;
-    numEl.classList.add('pop');
-
-    // Animate ring drain for this step
-    const start = performance.now();
-    function animRing(now) {
-      if (countdownAbort) return;
-      const p = Math.min(1, (now - start) / STEP_MS);
-      ringFill.style.strokeDashoffset = CIRC * p;
-      if (p < 1) requestAnimationFrame(animRing);
-    }
-    requestAnimationFrame(animRing);
-
-    step++;
-    setTimeout(tick, STEP_MS);
-  }
-
-  function cleanup() {
-    overlay.classList.remove('visible');
-  }
-
-  cancelBtn.onclick = () => { countdownAbort = true; };
-  tick();
-}
-
-// ── Core record start/stop ──
-async function beginRecording() {
-  const btn     = document.getElementById('sample-rec-btn');
-  const timerEl = document.getElementById('sample-timer');
-  const bar     = document.getElementById('sample-progress-bar');
-  const secs    = sampleBeats * stepDur();
-
-  let stream;
-  try {
-    stream = await acquireMic();
-  } catch(err) {
-    btn.disabled = false;
-    btn.textContent = recMode === 'hold' ? '⏺ Hold to Record' : '⏺ Record';
-    timerEl.textContent = '';
-    alert('Microphone access denied. Please allow mic access and try again.');
-    return;
-  }
-
-  mediaStream = stream;
-  recChunks = [];
-  pendingBuffer = null;
-
-  // Live waveform analyser
-  const srcNode = AC.createMediaStreamSource(mediaStream);
-  analyserNode = AC.createAnalyser();
-  analyserNode.fftSize = 512;
-  srcNode.connect(analyserNode);
-  recAnimHandle = requestAnimationFrame(drawLiveWaveform);
-
-  mediaRecorder = new MediaRecorder(mediaStream, (() => {
-    // Pick the first actually-supported type; empty string = browser default (safest on Android)
-    const preferred = [
-      'audio/ogg;codecs=opus',
-      'audio/webm;codecs=opus',
-      'audio/webm',
-      'audio/ogg',
-    ];
-    const mime = preferred.find(t => MediaRecorder.isTypeSupported(t)) || '';
-    return mime ? { mimeType: mime } : {};
-  })());
-  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
-  mediaRecorder.onstop = async () => {
-    cancelAnimationFrame(recAnimHandle);
-    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
-    btn.textContent = recMode === 'hold' ? '⏺ Hold to Record' : '⏺ Record';
-    btn.classList.remove('recording');
-    btn.disabled = false;
-    timerEl.style.color = 'var(--accent)';
-    timerEl.textContent = 'decoding…';
-    try {
-      // Use the exact mimeType the recorder used (critical on Android)
-      const mimeType = mediaRecorder.mimeType || '';
-      const blob = new Blob(recChunks, mimeType ? { type: mimeType } : {});
-      const arrayBuf = await blob.arrayBuffer();
-      // Try decode — on Android a fresh AudioContext decodes more reliably
-      let decoded = null;
-      const tryDecode = (ctx) => new Promise((res, rej) => {
-        // Use callback form for broadest Android compatibility
-        ctx.decodeAudioData(arrayBuf.slice(0), res, rej);
-      });
-      try {
-        decoded = await tryDecode(AC);
-      } catch(e1) {
-        // Fallback: fresh throwaway AudioContext (Android WebView workaround)
-        try {
-          const ac2 = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
-          decoded = await tryDecode(ac2);
-          ac2.close();
-        } catch(e2) {
-          throw e2;
-        }
-      }
-      pendingBuffer = decoded;
-      drawBufferWaveform(pendingBuffer);
-      document.getElementById('sm-confirm').disabled = false;
-      document.getElementById('sm-play').disabled = false;
-      timerEl.textContent = pendingBuffer.duration.toFixed(2) + 's';
-    } catch(err) {
-      timerEl.textContent = 'decode error :(';
-      console.error('Sample decode failed:', err);
-    }
-  };
-  mediaRecorder.start();
-
-  btn.textContent = recMode === 'hold' ? '● Recording…' : '⏹ Stop';
-  btn.classList.add('recording');
-  btn.disabled = (recMode === 'hold'); // hold mode: button is just visual, release = stop
-  if (bar) bar.style.width = '0%';
-  timerEl.style.color = 'var(--accent)';
-
-  let elapsed = 0;
-  const tick = 50;
-  recTimerHandle = setInterval(() => {
-    elapsed += tick / 1000;
-    const remaining = Math.max(0, secs - elapsed);
-    timerEl.textContent = remaining.toFixed(1) + 's';
-    if (bar) bar.style.width = Math.min(100, (elapsed / secs) * 100) + '%';
-    if (elapsed >= secs) stopRecording();
-  }, tick);
-}
-
-function stopRecording() {
-  clearInterval(recTimerHandle);
-  cancelAnimationFrame(recAnimHandle);
-  cancelAnimationFrame(holdRafHandle);
-  hideHoldRing();
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-  if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
-  const btn = document.getElementById('sample-rec-btn');
-  if (btn) {
-    btn.textContent = recMode === 'hold' ? '⏺ Hold to Record' : '⏺ Record';
-    btn.classList.remove('recording');
-    btn.disabled = false;
-  }
-  analyserNode = null;
-}
-
-// ── Hold ring visual ──
-function showHoldRing(btnEl) {
-  const wrap = document.getElementById('hold-ring-wrap');
-  const arc  = document.getElementById('hold-arc');
-  const HOLD_FILL_MS = 600; // time to fill ring = trigger record
-
-  const rect = btnEl.getBoundingClientRect();
-  const cx = rect.left + rect.width / 2;
-  const cy = rect.top  + rect.height / 2;
-  wrap.style.left   = (cx - 60) + 'px';
-  wrap.style.top    = (cy - 60) + 'px';
-  wrap.classList.add('visible');
-
-  const C = 2 * Math.PI * 52; // matches r="52"
-  arc.style.strokeDasharray  = C;
-  arc.style.strokeDashoffset = C;
-
-  holdStartTime = performance.now();
-  let triggered = false;
-
-  function animHold(now) {
-    const p = Math.min(1, (now - holdStartTime) / HOLD_FILL_MS);
-    arc.style.strokeDashoffset = C * (1 - p);
-    if (p >= 1 && !triggered) {
-      triggered = true;
-      hideHoldRing();
-      beginRecording();
-      return;
-    }
-    if (p < 1) holdRafHandle = requestAnimationFrame(animHold);
-  }
-  holdRafHandle = requestAnimationFrame(animHold);
-  return () => triggered; // getter
-}
-
-function hideHoldRing() {
-  cancelAnimationFrame(holdRafHandle);
-  document.getElementById('hold-ring-wrap').classList.remove('visible');
-  document.getElementById('hold-arc').style.strokeDashoffset =
-    '' + (2 * Math.PI * 52);
-}
-
-// ── TAP mode: button click → countdown → record ──
-function handleTapRecord() {
-  if (mediaRecorder && mediaRecorder.state === 'recording') {
-    stopRecording();
-    return;
-  }
-  const btn = document.getElementById('sample-rec-btn');
-  btn.disabled = true;
-  btn.textContent = '…';
-  showCountdown(
-    () => { beginRecording(); },
-    () => { btn.disabled = false; btn.textContent = '⏺ Record'; }
-  );
-}
-
-// ── HOLD mode ──
-function handleHoldStart(e) {
-  if (recMode !== 'hold') return;
-  if (mediaRecorder && mediaRecorder.state === 'recording') return;
-  e.preventDefault();
-  showHoldRing(document.getElementById('sample-rec-btn'));
-}
-function handleHoldEnd(e) {
-  if (recMode !== 'hold') return;
-  e.preventDefault();
-  cancelAnimationFrame(holdRafHandle);
-  hideHoldRing();
-  if (mediaRecorder && mediaRecorder.state === 'recording') {
-    stopRecording();
-  }
-}
-
-// ── Wire up button ──
-const recBtn = document.getElementById('sample-rec-btn');
-
-recBtn.addEventListener('click', (e) => {
-  if (recMode === 'tap') handleTapRecord();
-});
-
-// Touch events for hold mode (prevents ghost clicks on Android)
-recBtn.addEventListener('touchstart', (e) => {
-  if (recMode === 'hold') { handleHoldStart(e); }
-}, { passive: false });
-recBtn.addEventListener('touchend',   (e) => {
-  if (recMode === 'hold') handleHoldEnd(e);
-}, { passive: false });
-recBtn.addEventListener('touchcancel',(e) => {
-  if (recMode === 'hold') handleHoldEnd(e);
-}, { passive: false });
-// Mouse fallback for hold on desktop
-recBtn.addEventListener('mousedown', (e) => {
-  if (recMode === 'hold') handleHoldStart(e);
-});
-recBtn.addEventListener('mouseup', (e) => {
-  if (recMode === 'hold') handleHoldEnd(e);
-});
-recBtn.addEventListener('mouseleave', (e) => {
-  if (recMode === 'hold' && holdRafHandle) handleHoldEnd(e);
-});
-
-// Cancel in countdown overlay
-document.getElementById('countdown-cancel').addEventListener('click', () => {
-  countdownAbort = true;
-});
-
-// ── Mode toggle ──
-document.querySelectorAll('.rec-mode-btn').forEach(b => {
-  b.addEventListener('click', () => {
-    recMode = b.dataset.mode;
-    document.querySelectorAll('.rec-mode-btn').forEach(x => x.classList.toggle('active', x === b));
-    const hint = document.getElementById('rec-mode-hint');
-    const recBtnEl = document.getElementById('sample-rec-btn');
-    if (recMode === 'hold') {
-      hint.textContent = 'hold to record, release to stop';
-      recBtnEl.textContent = '⏺ Hold to Record';
-    } else {
-      hint.textContent = 'tap to start/stop';
-      recBtnEl.textContent = '⏺ Record';
-    }
-    stopRecording();
-  });
 });
 
 document.getElementById('sm-play').addEventListener('click', () => {
@@ -2485,8 +2446,18 @@ document.getElementById('sm-play').addEventListener('click', () => {
 
 document.querySelectorAll('.sm-len').forEach(btn => {
   btn.addEventListener('click', () => {
+    if (tapeActive) return; // don't change mid-recording
     sampleBeats = +btn.dataset.beats;
     document.querySelectorAll('.sm-len').forEach(b => b.classList.toggle('active', +b.dataset.beats === sampleBeats));
+    // Reposition center line
+    const cv = getTapeCanvas();
+    const stepSec = 60 / bpm / 4;
+    const prerollSecs = 2 * (60 / bpm);
+    const frac = prerollSecs / (prerollSecs + sampleBeats * stepSec);
+    const midX = Math.round(cv.width * frac);
+    document.getElementById('sm-center-line').style.left = midX + 'px';
+    document.getElementById('sm-rec-tint').style.left = midX + 'px';
+    document.getElementById('sm-rec-tint').style.width = (cv.width - midX) + 'px';
   });
 });
 
@@ -2510,10 +2481,25 @@ function setupRecDoubleTap(instId) {
 }
 
 // ─── Controls ─────────────────────────────────────────────────────
-document.getElementById('menu-btn').addEventListener('click', function() {
-  const panel = document.getElementById('menu-panel');
-  const open = panel.classList.toggle('open');
-  this.classList.toggle('active', open);
+// ── Gear dropdown ──
+const gearBtn  = document.getElementById('gear-btn');
+const gearMenu = document.getElementById('gear-menu');
+gearBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const open = gearMenu.classList.toggle('open');
+  gearBtn.classList.toggle('active', open);
+});
+document.addEventListener('pointerdown', (e) => {
+  if (!gearMenu.contains(e.target) && e.target !== gearBtn) {
+    gearMenu.classList.remove('open');
+    gearBtn.classList.remove('active');
+  }
+}, true);
+
+// Glow toggle inside gear menu
+document.getElementById('glow-item').addEventListener('click', () => {
+  glowOn = !glowOn;
+  document.getElementById('glow-toggle').classList.toggle('active', glowOn);
 });
 
 document.getElementById('play-btn').addEventListener('click', function () {
@@ -2523,16 +2509,44 @@ document.getElementById('play-btn').addEventListener('click', function () {
   if (isPlaying) startSeq(); else stopSeq();
 });
 
-document.getElementById('quant-btn').addEventListener('click', function () {
-  quantOn = !quantOn;
-  this.textContent = quantOn ? 'QUANT ON' : 'QUANT OFF';
-  this.classList.toggle('active', quantOn);
+const clrBtn  = document.getElementById('clear-btn');
+const clrFill = document.getElementById('clr-fill');
+const CLR_HOLD_MS = 1000;
+let clrRAF = null;
+let clrStart = 0;
+let clrFired = false;
+
+function clrCancel() {
+  cancelAnimationFrame(clrRAF);
+  clrRAF = null;
+  clrFill.style.width = '0%';
+  clrFired = false;
+}
+
+clrBtn.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  clrBtn.setPointerCapture(e.pointerId);
+  clrFired = false;
+  clrStart = performance.now();
+  function tick(now) {
+    const p = Math.min(1, (now - clrStart) / CLR_HOLD_MS);
+    clrFill.style.width = (p * 100) + '%';
+    if (p < 1) {
+      clrRAF = requestAnimationFrame(tick);
+    } else {
+      clrFired = true;
+      clrFill.style.width = '100%';
+      Object.keys(notes).forEach(k => notes[k] = []);
+      renderAll();
+      setTimeout(clrCancel, 180);
+    }
+  }
+  clrRAF = requestAnimationFrame(tick);
 });
 
-document.getElementById('clear-btn').addEventListener('click', function () {
-  Object.keys(notes).forEach(k => notes[k] = []);
-  renderAll();
-});
+clrBtn.addEventListener('pointerup',     clrCancel);
+clrBtn.addEventListener('pointercancel', clrCancel);
+clrBtn.addEventListener('pointerleave',  clrCancel);
 
 document.getElementById('bpm-slider').addEventListener('input', function () {
   bpm = +this.value;
@@ -2579,17 +2593,138 @@ document.getElementById('synth-toggle-bar').addEventListener('click', () => {
 // ─── Init ─────────────────────────────────────────────────────────
 buildBands();
 selectInst('kick');
+document.getElementById('glow-toggle').classList.add('active');
 
 // Populate scene select
 const sceneSelect = document.getElementById('scene-select');
+const builtinGrp = document.createElement('optgroup');
+builtinGrp.label = 'Built-in';
+sceneSelect.appendChild(builtinGrp);
 SCENE_PRESETS.forEach((s, i) => {
   const opt = document.createElement('option');
   opt.value = i; opt.textContent = s.name;
-  sceneSelect.appendChild(opt);
+  builtinGrp.appendChild(opt);
 });
 sceneSelect.addEventListener('change', function() {
   if (this.value === '') return;
-  loadScene(SCENE_PRESETS[+this.value]);
+  if (this.value.startsWith('u:')) {
+    // User preset
+    const name = this.value.slice(2);
+    loadUserPreset(name);
+  } else {
+    loadScene(SCENE_PRESETS[+this.value]);
+  }
+  this.style.color = 'var(--accent)';
+});
+
+// ── Inline prompt (replaces window.prompt for Android) ──────────
+function showPresetNamePrompt(onConfirm) {
+  const overlay = document.getElementById('inline-prompt');
+  const input   = document.getElementById('inline-prompt-input');
+  const okBtn   = document.getElementById('inline-prompt-ok');
+  const cancelBtn = document.getElementById('inline-prompt-cancel');
+  document.getElementById('inline-prompt-label').textContent = 'Preset name';
+  input.value = '';
+  overlay.style.display = 'flex';
+  setTimeout(() => input.focus(), 80);
+
+  function close() {
+    overlay.style.display = 'none';
+    okBtn.removeEventListener('click', confirm);
+    cancelBtn.removeEventListener('click', cancel);
+    input.removeEventListener('keydown', onKey);
+  }
+  function confirm() { close(); onConfirm(input.value); }
+  function cancel()  { close(); }
+  function onKey(e)  { if (e.key === 'Enter') confirm(); if (e.key === 'Escape') cancel(); }
+
+  okBtn.addEventListener('click', confirm);
+  cancelBtn.addEventListener('click', cancel);
+  input.addEventListener('keydown', onKey);
+}
+
+// ── User preset storage ──────────────────────────────────────────
+function captureScene(name) {
+  return {
+    name,
+    bpm, steps, swing,
+    sp: JSON.parse(JSON.stringify(SP)),
+    notes: Object.fromEntries(
+      Object.entries(notes).map(([k, v]) => [k, v.map(n => ({...n}))])
+    ),
+  };
+}
+
+async function saveUserPreset() {
+  // Use inline prompt UI instead of window.prompt (blocked in some Android WebViews)
+  showPresetNamePrompt(async (name) => {
+    if (!name || !name.trim()) return;
+    const scene = captureScene(name.trim());
+    try {
+      localStorage.setItem('preset:' + name.trim(), JSON.stringify(scene));
+      addUserPresetOption(name.trim());
+      setTimeout(() => {
+        sceneSelect.value = 'u:' + name.trim();
+        sceneSelect.style.color = 'var(--accent)';
+      }, 0);
+    } catch(e) { console.error('Save preset failed', e); }
+  });
+}
+
+async function loadUserPreset(name) {
+  try {
+    const raw = localStorage.getItem('preset:' + name);
+    if (!raw) return;
+    loadScene(JSON.parse(raw));
+  } catch(e) { console.error('Load preset failed', e); }
+}
+
+function addUserPresetOption(name) {
+  // Avoid duplicates
+  if (sceneSelect.querySelector(`option[value="u:${CSS.escape(name)}"]`) ||
+      sceneSelect.querySelector(`option[value="u:${name}"]`)) return;
+  // Ensure user optgroup exists
+  let grp = sceneSelect.querySelector('optgroup[label="My Presets"]');
+  if (!grp) {
+    grp = document.createElement('optgroup');
+    grp.label = 'My Presets';
+    sceneSelect.appendChild(grp);
+  }
+  const opt = document.createElement('option');
+  opt.value = 'u:' + name;
+  opt.textContent = name;
+  grp.appendChild(opt);
+  console.log('Added preset option:', name, '→ total options:', sceneSelect.options.length);
+  return opt;
+}
+
+async function loadAllUserPresets() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('preset:')) {
+        addUserPresetOption(key.replace('preset:', ''));
+      }
+    }
+  } catch(e) { console.log('localStorage not available:', e.message); }
+}
+loadAllUserPresets();
+
+// Gear menu actions
+document.getElementById('save-preset-item').addEventListener('click', () => {
+  gearMenu.classList.remove('open');
+  gearBtn.classList.remove('active');
+  saveUserPreset();
+});
+
+document.getElementById('clear-samples-item').addEventListener('click', () => {
+  INSTRUMENTS.forEach(inst => {
+    instSamples[inst.id] = null;
+    const btn = document.getElementById('rec-' + inst.id);
+    if (btn) btn.classList.remove('sampled');
+  });
+  gearMenu.classList.remove('open');
+  gearBtn.classList.remove('active');
 });
 
 // Render after fonts + layout settle
