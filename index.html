@@ -359,6 +359,91 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
 
 /* Scrollbar hide */
 ::-webkit-scrollbar{display:none;}
+
+/* ── SAMPLE MODAL ── */
+#sample-modal{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,0.75);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+}
+#sample-modal.visible{display:flex;}
+#sample-box{
+  background:var(--s1);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:18px;
+  width:min(340px,92vw);
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+#sample-box .sm-title{
+  font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;
+}
+#sample-box .sm-lengths{
+  display:flex;gap:6px;flex-wrap:wrap;
+}
+.sm-len{
+  background:var(--s2);border:1px solid var(--border);
+  color:var(--muted);font-family:'JetBrains Mono',monospace;
+  font-size:10px;padding:5px 10px;cursor:pointer;border-radius:3px;
+  transition:all 0.12s;
+}
+.sm-len.active{background:var(--s3);color:var(--accent);border-color:var(--accent);}
+.sm-len:active{transform:scale(0.93);}
+#sample-canvas-wrap{
+  position:relative;
+  width:100%;
+  border-radius:4px;
+  overflow:hidden;
+  border:1px solid var(--border);
+  background:var(--s2);
+}
+#sample-canvas{
+  width:100%;height:80px;display:block;
+}
+#sample-progress-bar{
+  position:absolute;
+  bottom:0;left:0;height:3px;
+  background:var(--accent);
+  width:0%;
+  transition:none;
+}
+#sample-rec-btn{
+  width:100%;padding:12px;border-radius:6px;cursor:pointer;
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
+  letter-spacing:0.12em;text-transform:uppercase;border:none;
+  background:var(--s3);color:var(--text);transition:all 0.15s;
+}
+#sample-rec-btn.recording{background:#e03030;color:#fff;animation:pulse-rec 0.6s ease-in-out infinite alternate;}
+@keyframes pulse-rec{from{opacity:1}to{opacity:0.6}}
+#sample-timer{
+  text-align:center;font-size:22px;font-weight:700;color:var(--accent);
+  font-family:'JetBrains Mono',monospace;min-height:28px;
+}
+.sm-actions{display:flex;gap:8px;}
+.sm-btn{
+  flex:1;padding:8px;border-radius:4px;cursor:pointer;
+  font-family:'JetBrains Mono',monospace;font-size:10px;
+  font-weight:700;letter-spacing:0.1em;text-transform:uppercase;
+  border:1px solid var(--border);background:var(--s2);color:var(--text);
+  transition:all 0.12s;
+}
+.sm-btn.confirm{background:var(--accent);color:#000;border-color:var(--accent);}
+.sm-btn:active{transform:scale(0.95);}
+.sm-btn:disabled{opacity:0.35;cursor:default;}
+.inst-rec{
+  position:relative;font-size:6px;font-weight:700;
+  letter-spacing:0.08em;text-transform:uppercase;
+  color:var(--muted);cursor:pointer;border:1px solid var(--border);
+  border-radius:2px;padding:1px 3px;margin-top:1px;
+  background:var(--s2);z-index:1;transition:all 0.12s;
+}
+.inst-rec.sampled{color:var(--accent);border-color:var(--accent);}
+.inst-rec:active{transform:scale(0.9);}
 </style>
 </head>
 <body>
@@ -405,6 +490,33 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
 
   <!-- Y-PARAM PICKER -->
   <div id="yparam-picker"></div>
+
+  <!-- SAMPLE MODAL -->
+  <div id="sample-modal">
+    <div id="sample-box">
+      <div class="sm-title" id="sm-title">Sample — KICK</div>
+      <div class="sm-lengths">
+        <button class="sm-len" data-beats="1">1 note</button>
+        <button class="sm-len active" data-beats="2">2 notes</button>
+        <button class="sm-len" data-beats="4">4 notes</button>
+        <button class="sm-len" data-beats="8">2 bars</button>
+        <button class="sm-len" data-beats="16">4 bars</button>
+      </div>
+      <div class="sm-canvas-wrap" id="sm-canvas-wrap" style="position:relative;width:100%;border-radius:4px;overflow:hidden;border:1px solid var(--border);background:#18182a;">
+        <canvas id="sample-canvas" style="width:100%;height:80px;display:block;"></canvas>
+        <div id="sample-progress-bar" style="position:absolute;bottom:0;left:0;height:3px;background:var(--accent);width:0%;"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div id="sample-timer" style="flex:1;text-align:left;font-size:18px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace;min-height:24px;"></div>
+        <button class="sm-btn" id="sm-play" disabled style="flex:0;padding:6px 14px;">▶ Play</button>
+      </div>
+      <button id="sample-rec-btn">⏺ Record</button>
+      <div class="sm-actions">
+        <button class="sm-btn" id="sm-cancel">Cancel</button>
+        <button class="sm-btn confirm" id="sm-confirm" disabled>Use Sample</button>
+      </div>
+    </div>
+  </div>
 
   <!-- BANDS -->
   <div id="bands"></div>
@@ -679,8 +791,41 @@ function playTom(t, vel = 1, overrides = {}) {
 
 function velCurve(v) { return Math.pow(v, 2.2); }
 
+// ─── Sample Engine ────────────────────────────────────────────────
+const instSamples = { kick:null, snare:null, hihat:null, tom:null };
+const instSampleBeats = { kick:2, snare:2, hihat:2, tom:2 };
+
+function playSample(id, t, vel, dur) {
+  const buf = instSamples[id];
+  if (!buf) return;
+  const v = velCurve(vel) * (instVol[id] ?? 1);
+  const noteSecs = dur * stepDur();
+  const src = AC.createBufferSource();
+  src.buffer = buf;
+
+  if (noteSecs >= buf.duration) {
+    // Stretch: slow down playback to fill the note duration
+    src.playbackRate.value = buf.duration / noteSecs;
+  } else {
+    // Chop: play at normal speed, cut off at note end
+    src.playbackRate.value = 1;
+  }
+
+  const playDur = Math.min(noteSecs, buf.duration / src.playbackRate.value);
+  const g = AC.createGain();
+  g.gain.setValueAtTime(v, t);
+  // Small fade at end to avoid click on chop
+  if (noteSecs < buf.duration) {
+    g.gain.setValueAtTime(v, t + playDur - 0.01);
+    g.gain.linearRampToValueAtTime(0, t + playDur);
+  }
+  src.connect(g); g.connect(masterGain);
+  src.start(t); src.stop(t + playDur + 0.01);
+}
+
 function triggerInst(id, t, vel, dur, overrides = {}) {
   if (muted[id]) return;
+  if (instSamples[id]) { playSample(id, t, vel, dur); return; }
   const v = velCurve(vel) * (instVol[id] ?? 1);
   if (id === 'kick')  playKick(t, v, overrides);
   else if (id === 'snare') playSnare(t, v, overrides);
@@ -1171,7 +1316,7 @@ function setupBandEvents(instId, canvas) {
         triggerInst(instId, AC.currentTime + 0.01, hit.note.vel, hit.note.dur);
       } else {
         const step = xToStep(ds.startX);
-        const dur = 1;
+        const dur = instSamples[instId] ? instSampleBeats[instId] : 1;
         const vel = yToVel(ds.startY);
         const yVal = vel; // yVal = same as vel initially
         const safe = Math.max(0, Math.min(steps - dur, step));
@@ -1310,7 +1455,8 @@ function buildBands() {
     lbl.innerHTML = `
       <div class="vol-fill" id="volfill-${inst.id}" style="background:${inst.color};height:${instVol[inst.id]*100}%"></div>
       <span class="inst-name">${inst.name}</span>
-      <span class="inst-yparam" id="yparam-ind-${inst.id}" style="display:${instYParam[inst.id] ? 'block' : 'none'};color:${inst.color}">${instYParam[inst.id] || ''}</span>
+      <span class="inst-yparam" id="yparam-ind-${inst.id}" style="display:${instYParam[inst.id] && instYParam[inst.id]!=='none' ? 'block' : 'none'};color:${inst.color}">${instYParam[inst.id] && instYParam[inst.id]!=='none' ? instYParam[inst.id].toUpperCase() : ''}</span>
+      <span class="inst-rec${instSamples[inst.id] ? ' sampled' : ''}" id="rec-${inst.id}">⏺</span>
       <span class="inst-mute${muted[inst.id] ? ' muted' : ''}" id="mute-${inst.id}">M</span>
     `;
 
@@ -1323,6 +1469,29 @@ function buildBands() {
       muteBtn.classList.toggle('muted', muted[inst.id]);
       renderBand(inst.id);
     });
+
+    // REC button: tap to open sample modal, hold to clear sample
+    const recBtn = lbl.querySelector('.inst-rec');
+    recBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    let recHoldTimer = null;
+    recBtn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      recHoldTimer = setTimeout(() => {
+        recHoldTimer = null;
+        if (instSamples[inst.id]) {
+          instSamples[inst.id] = null;
+          recBtn.classList.remove('sampled');
+        }
+      }, 600);
+    });
+    recBtn.addEventListener('pointerup', (e) => {
+      e.stopPropagation();
+      if (recHoldTimer !== null) {
+        clearTimeout(recHoldTimer); recHoldTimer = null;
+        openSampleModal(inst.id);
+      }
+    });
+    recBtn.addEventListener('pointercancel', () => { clearTimeout(recHoldTimer); recHoldTimer = null; });
 
     let holdTimer = null;
     let pointerStartY = 0;
@@ -1681,6 +1850,267 @@ function loadScene(scene) {
   renderAll();
   // Reset step cursor display
   document.getElementById('scene-select').value = '';
+}
+
+// ─── Sample Modal ─────────────────────────────────────────────────
+let sampleInstId = null;
+let sampleBeats = 2;
+let mediaStream = null;
+let mediaRecorder = null;
+let recChunks = [];
+let pendingBuffer = null;
+let recTimerHandle = null;
+let recAnimHandle = null;
+let analyserNode = null;
+
+function openSampleModal(instId) {
+  resumeAC();
+  sampleInstId = instId;
+  pendingBuffer = null;
+  recChunks = [];
+  const inst = INSTRUMENTS.find(i => i.id === instId);
+  document.getElementById('sm-title').textContent = `Sample — ${inst.name}`;
+  document.getElementById('sm-title').style.color = inst.color;
+  document.getElementById('sample-rec-btn').textContent = '⏺ Record';
+  document.getElementById('sample-rec-btn').classList.remove('recording');
+  document.getElementById('sample-rec-btn').disabled = false;
+  document.getElementById('sample-timer').textContent = '';
+  document.getElementById('sm-confirm').disabled = true;
+  document.getElementById('sm-play').disabled = true;
+  const bar = document.getElementById('sample-progress-bar');
+  if (bar) bar.style.width = '0%';
+  document.querySelectorAll('.sm-len').forEach(b => b.classList.toggle('active', +b.dataset.beats === sampleBeats));
+  clearWaveform();
+  document.getElementById('sample-modal').classList.add('visible');
+  // Let layout settle then size canvas and clear it
+  setTimeout(() => {
+    const cv = getCanvas();
+    const cx = cv.getContext('2d');
+    cx.fillStyle = '#18182a';
+    cx.fillRect(0, 0, cv.width, cv.height);
+  }, 30);
+}
+
+function closeSampleModal() {
+  stopRecording();
+  // Also stop any mic stream that might be open during countdown
+  if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+  document.getElementById('sample-modal').classList.remove('visible');
+  sampleInstId = null;
+}
+
+function clearWaveform() {
+  const cv = document.getElementById('sample-canvas');
+  const cx = cv.getContext('2d');
+  cv.width = cv.offsetWidth; cv.height = cv.offsetHeight;
+  cx.fillStyle = '#18182a';
+  cx.fillRect(0, 0, cv.width, cv.height);
+}
+
+function getCanvas() {
+  const cv = document.getElementById('sample-canvas');
+  const wrap = cv.parentElement;
+  const w = wrap.offsetWidth || 300;
+  const h = 80;
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  return cv;
+}
+
+function drawLiveWaveform() {
+  if (!analyserNode) return;
+  const cv = getCanvas();
+  const cx = cv.getContext('2d');
+  const w = cv.width, h = cv.height;
+  const buf = new Uint8Array(analyserNode.frequencyBinCount);
+  analyserNode.getByteTimeDomainData(buf);
+  cx.fillStyle = '#18182a';
+  cx.fillRect(0, 0, w, h);
+  cx.strokeStyle = '#00e5c8';
+  cx.lineWidth = 1.5;
+  cx.beginPath();
+  for (let i = 0; i < buf.length; i++) {
+    const x = (i / buf.length) * w;
+    const y = ((buf[i] / 128) - 1) * (h / 2) + h / 2;
+    i === 0 ? cx.moveTo(x, y) : cx.lineTo(x, y);
+  }
+  cx.stroke();
+  recAnimHandle = requestAnimationFrame(drawLiveWaveform);
+}
+
+function drawBufferWaveform(audioBuf) {
+  const cv = getCanvas();
+  const cx = cv.getContext('2d');
+  const w = cv.width, h = cv.height;
+  const data = audioBuf.getChannelData(0);
+  const step = Math.max(1, Math.floor(data.length / w));
+  cx.fillStyle = '#18182a';
+  cx.fillRect(0, 0, w, h);
+  cx.strokeStyle = '#00e5c8';
+  cx.lineWidth = 1;
+  cx.beginPath();
+  for (let i = 0; i < w; i++) {
+    let min = 1, max = -1;
+    for (let j = 0; j < step; j++) {
+      const v = data[i * step + j] || 0;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    cx.moveTo(i, (1 + min) * h / 2);
+    cx.lineTo(i, (1 + max) * h / 2);
+  }
+  cx.stroke();
+  // Reset progress bar
+  const bar = document.getElementById('sample-progress-bar');
+  if (bar) bar.style.width = '0%';
+}
+
+function playBeep(freq = 880, dur = 0.08, when = AC.currentTime) {
+  const o = AC.createOscillator();
+  const g = AC.createGain();
+  o.frequency.value = freq;
+  o.type = 'sine';
+  g.gain.setValueAtTime(0.3, when);
+  g.gain.exponentialRampToValueAtTime(0.001, when + dur);
+  o.connect(g); g.connect(masterGain);
+  o.start(when); o.stop(when + dur + 0.01);
+}
+
+async function startRecording() {
+  const btn = document.getElementById('sample-rec-btn');
+  const timerEl = document.getElementById('sample-timer');
+  const bar = document.getElementById('sample-progress-bar');
+  const secs = sampleBeats * stepDur();
+
+  // Visual countdown first — no mic yet
+  btn.disabled = true;
+  btn.textContent = '...';
+  for (const count of ['3', '2', '1']) {
+    if (!document.getElementById('sample-modal').classList.contains('visible')) return;
+    timerEl.style.color = '#ff5e2a';
+    timerEl.textContent = count;
+    await new Promise(r => setTimeout(r, 700));
+  }
+  if (!document.getElementById('sample-modal').classList.contains('visible')) return;
+
+  // GO — no beep, just start immediately
+  timerEl.style.color = 'var(--accent)';
+  timerEl.textContent = secs.toFixed(1) + 's';
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = '⏺ Record';
+    timerEl.textContent = '';
+    timerEl.style.color = 'var(--accent)';
+    alert('Microphone access denied. Please allow mic access and try again.');
+    return;
+  }
+
+  recChunks = [];
+  pendingBuffer = null;
+
+  // Live waveform
+  const srcNode = AC.createMediaStreamSource(mediaStream);
+  analyserNode = AC.createAnalyser();
+  analyserNode.fftSize = 512;
+  srcNode.connect(analyserNode);
+  recAnimHandle = requestAnimationFrame(drawLiveWaveform);
+
+  mediaRecorder = new MediaRecorder(mediaStream, {
+    mimeType: ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg']
+      .find(t => MediaRecorder.isTypeSupported(t)) || ''
+  });
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
+  mediaRecorder.onstop = async () => {
+    cancelAnimationFrame(recAnimHandle);
+    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+    btn.textContent = '⏺ Record';
+    btn.classList.remove('recording');
+    btn.disabled = false;
+    timerEl.style.color = 'var(--accent)';
+    try {
+      const blob = new Blob(recChunks);
+      const arrayBuf = await blob.arrayBuffer();
+      pendingBuffer = await AC.decodeAudioData(arrayBuf);
+      drawBufferWaveform(pendingBuffer);
+      document.getElementById('sm-confirm').disabled = false;
+      document.getElementById('sm-play').disabled = false;
+      timerEl.textContent = pendingBuffer.duration.toFixed(2) + 's';
+    } catch(err) {
+      timerEl.textContent = 'decode error :(';
+      console.error('Sample decode failed:', err);
+    }
+  };
+  mediaRecorder.start();
+
+  btn.textContent = '⏹ Stop';
+  btn.classList.add('recording');
+  btn.disabled = false;
+  if (bar) bar.style.width = '0%';
+
+  let elapsed = 0;
+  const tick = 50;
+  recTimerHandle = setInterval(() => {
+    elapsed += tick / 1000;
+    const remaining = Math.max(0, secs - elapsed);
+    timerEl.textContent = remaining.toFixed(1) + 's';
+    if (bar) bar.style.width = Math.min(100, (elapsed / secs) * 100) + '%';
+    if (elapsed >= secs) stopRecording();
+  }, tick);
+}
+
+function stopRecording() {
+  clearInterval(recTimerHandle);
+  cancelAnimationFrame(recAnimHandle);
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+  const btn = document.getElementById('sample-rec-btn');
+  if (btn) { btn.textContent = '⏺ Record'; btn.classList.remove('recording'); }
+  analyserNode = null;
+}
+
+document.getElementById('sm-play').addEventListener('click', () => {
+  if (!pendingBuffer) return;
+  resumeAC();
+  const src = AC.createBufferSource();
+  src.buffer = pendingBuffer;
+  src.connect(masterGain);
+  src.start(AC.currentTime);
+});
+
+document.getElementById('sample-rec-btn').addEventListener('click', () => {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    stopRecording();
+  } else {
+    startRecording();
+  }
+});
+
+document.querySelectorAll('.sm-len').forEach(btn => {
+  btn.addEventListener('click', () => {
+    sampleBeats = +btn.dataset.beats;
+    document.querySelectorAll('.sm-len').forEach(b => b.classList.toggle('active', +b.dataset.beats === sampleBeats));
+  });
+});
+
+document.getElementById('sm-cancel').addEventListener('click', () => {
+  closeSampleModal();
+});
+
+document.getElementById('sm-confirm').addEventListener('click', () => {
+  if (!pendingBuffer || !sampleInstId) return;
+  instSamples[sampleInstId] = pendingBuffer;
+  instSampleBeats[sampleInstId] = sampleBeats;
+  const recBtn = document.getElementById('rec-' + sampleInstId);
+  if (recBtn) recBtn.classList.add('sampled');
+  closeSampleModal();
+});
+
+// Double-tap REC button to clear sample
+const recBtnTimers = {};
+function setupRecDoubleTap(instId) {
+  // handled via long-hold: hold REC to clear sample
 }
 
 // ─── Controls ─────────────────────────────────────────────────────
