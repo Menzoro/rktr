@@ -363,7 +363,7 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
 /* ── SAMPLE MODAL ── */
 #sample-modal{
   position:fixed;inset:0;
-  background:rgba(0,0,0,0.75);
+  background:rgba(0,0,0,0.82);
   display:none;
   align-items:center;
   justify-content:center;
@@ -379,6 +379,8 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   display:flex;
   flex-direction:column;
   gap:12px;
+  position:relative;
+  overflow:hidden;
 }
 #sample-box .sm-title{
   font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;
@@ -412,14 +414,50 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   width:0%;
   transition:none;
 }
-#sample-rec-btn{
-  width:100%;padding:12px;border-radius:6px;cursor:pointer;
-  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
-  letter-spacing:0.12em;text-transform:uppercase;border:none;
-  background:var(--s3);color:var(--text);transition:all 0.15s;
+
+/* ── RECORD MODE TOGGLE ── */
+#rec-mode-toggle{
+  display:flex;
+  align-items:center;
+  gap:0;
+  border:1px solid var(--border);
+  border-radius:4px;
+  overflow:hidden;
+  flex-shrink:0;
 }
-#sample-rec-btn.recording{background:#e03030;color:#fff;animation:pulse-rec 0.6s ease-in-out infinite alternate;}
-@keyframes pulse-rec{from{opacity:1}to{opacity:0.6}}
+.rec-mode-btn{
+  flex:1;padding:5px 8px;
+  font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;
+  letter-spacing:0.1em;text-transform:uppercase;
+  border:none;background:var(--s2);color:var(--muted);
+  cursor:pointer;transition:all 0.15s;
+}
+.rec-mode-btn.active{background:var(--s3);color:var(--accent);}
+.rec-mode-btn:not(:last-child){border-right:1px solid var(--border);}
+
+/* ── RECORD BUTTON ── */
+#sample-rec-btn{
+  width:100%;padding:14px;border-radius:6px;cursor:pointer;
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
+  letter-spacing:0.12em;text-transform:uppercase;border:2px solid var(--border);
+  background:var(--s3);color:var(--text);transition:background 0.15s, border-color 0.15s, transform 0.1s;
+  touch-action:none; /* prevent scroll on hold */
+  -webkit-user-select:none;
+  user-select:none;
+}
+#sample-rec-btn.recording{
+  background:#b01c1c;color:#fff;border-color:#e03030;
+  animation:pulse-rec 0.7s ease-in-out infinite alternate;
+}
+#sample-rec-btn.hold-ready{
+  border-color:var(--accent);color:var(--accent);
+}
+#sample-rec-btn:active:not(:disabled){transform:scale(0.97);}
+@keyframes pulse-rec{
+  from{box-shadow:0 0 0 0 rgba(224,48,48,0);}
+  to{box-shadow:0 0 0 8px rgba(224,48,48,0);}
+}
+
 #sample-timer{
   text-align:center;font-size:22px;font-weight:700;color:var(--accent);
   font-family:'JetBrains Mono',monospace;min-height:28px;
@@ -444,6 +482,82 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
 }
 .inst-rec.sampled{color:var(--accent);border-color:var(--accent);}
 .inst-rec:active{transform:scale(0.9);}
+
+/* ── COUNTDOWN OVERLAY ── */
+#countdown-overlay{
+  position:absolute;inset:0;
+  background:rgba(8,8,16,0.93);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:10px;
+  z-index:10;
+  border-radius:10px;
+}
+#countdown-overlay.visible{display:flex;}
+#countdown-ring{
+  position:relative;
+  width:110px;height:110px;
+}
+#countdown-ring svg{
+  position:absolute;inset:0;
+  transform:rotate(-90deg);
+}
+#countdown-ring-track{
+  fill:none;stroke:var(--s3);stroke-width:5;
+}
+#countdown-ring-fill{
+  fill:none;stroke-width:5;
+  stroke-linecap:round;
+  transition:stroke-dashoffset 0.05s linear, stroke 0.3s;
+}
+#countdown-num{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:52px;font-weight:700;
+  font-family:'JetBrains Mono',monospace;
+  transition:transform 0.12s cubic-bezier(0.34,1.56,0.64,1), opacity 0.1s;
+}
+#countdown-num.pop{
+  animation:num-pop 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes num-pop{
+  0%{transform:scale(1.6);opacity:0}
+  60%{opacity:1}
+  100%{transform:scale(1);}
+}
+#countdown-label{
+  font-size:10px;letter-spacing:0.2em;text-transform:uppercase;
+  color:var(--muted);font-family:'JetBrains Mono',monospace;
+}
+#countdown-cancel{
+  font-size:9px;letter-spacing:0.12em;text-transform:uppercase;
+  color:var(--muted);font-family:'JetBrains Mono',monospace;
+  background:none;border:1px solid var(--border);border-radius:3px;
+  padding:4px 12px;cursor:pointer;margin-top:4px;
+  transition:color 0.12s, border-color 0.12s;
+}
+#countdown-cancel:hover{color:var(--text);border-color:var(--muted);}
+
+/* ── HOLD RING (hold-to-record visual) ── */
+#hold-ring-wrap{
+  pointer-events:none;
+  position:fixed;
+  display:none;
+  align-items:center;justify-content:center;
+  z-index:99999;
+  top:0;left:0;
+}
+#hold-ring-wrap.visible{display:flex;}
+#hold-ring-svg{overflow:visible;}
+#hold-arc{
+  fill:none;stroke:var(--accent);stroke-width:5;
+  stroke-linecap:round;
+  transform-origin:center;
+  transform:rotate(-90deg);
+  transition:none;
+}
 </style>
 </head>
 <body>
@@ -494,6 +608,19 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   <!-- SAMPLE MODAL -->
   <div id="sample-modal">
     <div id="sample-box">
+      <!-- Countdown overlay (inside modal box) -->
+      <div id="countdown-overlay">
+        <div id="countdown-ring">
+          <svg viewBox="0 0 110 110" width="110" height="110">
+            <circle id="countdown-ring-track" cx="55" cy="55" r="48"/>
+            <circle id="countdown-ring-fill" cx="55" cy="55" r="48"/>
+          </svg>
+          <div id="countdown-num">3</div>
+        </div>
+        <div id="countdown-label">GET READY</div>
+        <button id="countdown-cancel">CANCEL</button>
+      </div>
+
       <div class="sm-title" id="sm-title">Sample — KICK</div>
       <div class="sm-lengths">
         <button class="sm-len" data-beats="1">1 note</button>
@@ -501,6 +628,15 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
         <button class="sm-len" data-beats="4">4 notes</button>
         <button class="sm-len" data-beats="8">2 bars</button>
         <button class="sm-len" data-beats="16">4 bars</button>
+      </div>
+      <!-- Mode toggle -->
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:9px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;flex-shrink:0;">MODE</span>
+        <div id="rec-mode-toggle">
+          <button class="rec-mode-btn active" data-mode="tap">TAP</button>
+          <button class="rec-mode-btn" data-mode="hold">HOLD</button>
+        </div>
+        <span id="rec-mode-hint" style="font-size:8px;color:var(--muted);letter-spacing:0.06em;flex:1;text-align:right;">tap to start/stop</span>
       </div>
       <div class="sm-canvas-wrap" id="sm-canvas-wrap" style="position:relative;width:100%;border-radius:4px;overflow:hidden;border:1px solid var(--border);background:#18182a;">
         <canvas id="sample-canvas" style="width:100%;height:80px;display:block;"></canvas>
@@ -516,6 +652,15 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
         <button class="sm-btn confirm" id="sm-confirm" disabled>Use Sample</button>
       </div>
     </div>
+  </div>
+
+  <!-- Hold-ring overlay (full viewport, pointer-events:none) -->
+  <div id="hold-ring-wrap">
+    <svg id="hold-ring-svg" width="120" height="120" viewBox="0 0 120 120">
+      <circle cx="60" cy="60" r="52" fill="none" stroke="#22223a" stroke-width="6"/>
+      <circle id="hold-arc" cx="60" cy="60" r="52" fill="none" stroke-width="6"
+        stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+    </svg>
   </div>
 
   <!-- BANDS -->
@@ -1871,9 +2016,10 @@ function openSampleModal(instId) {
   const inst = INSTRUMENTS.find(i => i.id === instId);
   document.getElementById('sm-title').textContent = `Sample — ${inst.name}`;
   document.getElementById('sm-title').style.color = inst.color;
-  document.getElementById('sample-rec-btn').textContent = '⏺ Record';
-  document.getElementById('sample-rec-btn').classList.remove('recording');
-  document.getElementById('sample-rec-btn').disabled = false;
+  const recBtnEl = document.getElementById('sample-rec-btn');
+  recBtnEl.textContent = recMode === 'hold' ? '⏺ Hold to Record' : '⏺ Record';
+  recBtnEl.classList.remove('recording');
+  recBtnEl.disabled = false;
   document.getElementById('sample-timer').textContent = '';
   document.getElementById('sm-confirm').disabled = true;
   document.getElementById('sm-play').disabled = true;
@@ -1882,6 +2028,8 @@ function openSampleModal(instId) {
   document.querySelectorAll('.sm-len').forEach(b => b.classList.toggle('active', +b.dataset.beats === sampleBeats));
   clearWaveform();
   document.getElementById('sample-modal').classList.add('visible');
+  // Prefetch mic immediately so Android has no permission delay later
+  prefetchMic();
   // Let layout settle then size canvas and clear it
   setTimeout(() => {
     const cv = getCanvas();
@@ -1892,10 +2040,14 @@ function openSampleModal(instId) {
 }
 
 function closeSampleModal() {
+  countdownAbort = true;
   stopRecording();
+  releasePrefetchedMic();
   // Also stop any mic stream that might be open during countdown
   if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
   document.getElementById('sample-modal').classList.remove('visible');
+  document.getElementById('countdown-overlay').classList.remove('visible');
+  hideHoldRing();
   sampleInstId = null;
 }
 
@@ -1964,75 +2116,182 @@ function drawBufferWaveform(audioBuf) {
   if (bar) bar.style.width = '0%';
 }
 
-function playBeep(freq = 880, dur = 0.08, when = AC.currentTime) {
-  const o = AC.createOscillator();
-  const g = AC.createGain();
-  o.frequency.value = freq;
-  o.type = 'sine';
-  g.gain.setValueAtTime(0.3, when);
-  g.gain.exponentialRampToValueAtTime(0.001, when + dur);
-  o.connect(g); g.connect(masterGain);
-  o.start(when); o.stop(when + dur + 0.01);
+// ─── Recording — improved ─────────────────────────────────────────
+let recMode = 'tap';          // 'tap' | 'hold'
+let countdownAbort = false;   // cancels the countdown
+let prefetchedStream = null;  // mic stream grabbed on modal open
+let holdRafHandle = null;
+let holdStartTime = 0;
+
+// ── Mic pre-fetch (called when modal opens) ──
+async function prefetchMic() {
+  if (prefetchedStream) return; // already have it
+  try {
+    prefetchedStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    // Suspend immediately — we'll use it when recording starts
+    // Keep it alive but silent
+  } catch(_) {
+    prefetchedStream = null; // will fall back to requesting on demand
+  }
 }
 
-async function startRecording() {
-  const btn = document.getElementById('sample-rec-btn');
-  const timerEl = document.getElementById('sample-timer');
-  const bar = document.getElementById('sample-progress-bar');
-  const secs = sampleBeats * stepDur();
-
-  // Visual countdown first — no mic yet
-  btn.disabled = true;
-  btn.textContent = '...';
-  for (const count of ['3', '2', '1']) {
-    if (!document.getElementById('sample-modal').classList.contains('visible')) return;
-    timerEl.style.color = '#ff5e2a';
-    timerEl.textContent = count;
-    await new Promise(r => setTimeout(r, 700));
+async function acquireMic() {
+  if (prefetchedStream && prefetchedStream.active) {
+    const s = prefetchedStream;
+    prefetchedStream = null; // hand off ownership
+    return s;
   }
-  if (!document.getElementById('sample-modal').classList.contains('visible')) return;
+  return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+}
 
-  // GO — no beep, just start immediately
-  timerEl.style.color = 'var(--accent)';
-  timerEl.textContent = secs.toFixed(1) + 's';
+function releasePrefetchedMic() {
+  if (prefetchedStream) {
+    prefetchedStream.getTracks().forEach(t => t.stop());
+    prefetchedStream = null;
+  }
+}
 
+// ── Countdown ring ──
+const CIRC = 2 * Math.PI * 48; // matches r="48" in SVG
+function showCountdown(onGo, onCancel) {
+  countdownAbort = false;
+  const overlay  = document.getElementById('countdown-overlay');
+  const numEl    = document.getElementById('countdown-num');
+  const ringFill = document.getElementById('countdown-ring-fill');
+  const cancelBtn= document.getElementById('countdown-cancel');
+  const label    = document.getElementById('countdown-label');
+
+  const counts = [3, 2, 1];
+  const colors = ['#ff5e2a','#ffe040','#00e5c8'];
+
+  overlay.classList.add('visible');
+  label.textContent = 'GET READY';
+
+  let step = 0;
+  const STEP_MS = 700;
+
+  // Circumference of ring
+  ringFill.style.strokeDasharray  = CIRC;
+  ringFill.style.strokeDashoffset = 0;
+
+  function tick() {
+    if (countdownAbort) { cleanup(); onCancel(); return; }
+    if (step >= counts.length) {
+      // GO!
+      numEl.style.color = '#00e5c8';
+      numEl.textContent = '●';
+      label.textContent = 'REC';
+      ringFill.style.stroke = '#e03030';
+      ringFill.style.strokeDashoffset = 0;
+      numEl.classList.remove('pop');
+      void numEl.offsetWidth;
+      numEl.classList.add('pop');
+      setTimeout(() => { cleanup(); onGo(); }, 120);
+      return;
+    }
+    const n = counts[step];
+    numEl.style.color = colors[step];
+    ringFill.style.stroke = colors[step];
+    numEl.textContent = n;
+    numEl.classList.remove('pop');
+    void numEl.offsetWidth;
+    numEl.classList.add('pop');
+
+    // Animate ring drain for this step
+    const start = performance.now();
+    function animRing(now) {
+      if (countdownAbort) return;
+      const p = Math.min(1, (now - start) / STEP_MS);
+      ringFill.style.strokeDashoffset = CIRC * p;
+      if (p < 1) requestAnimationFrame(animRing);
+    }
+    requestAnimationFrame(animRing);
+
+    step++;
+    setTimeout(tick, STEP_MS);
+  }
+
+  function cleanup() {
+    overlay.classList.remove('visible');
+  }
+
+  cancelBtn.onclick = () => { countdownAbort = true; };
+  tick();
+}
+
+// ── Core record start/stop ──
+async function beginRecording() {
+  const btn     = document.getElementById('sample-rec-btn');
+  const timerEl = document.getElementById('sample-timer');
+  const bar     = document.getElementById('sample-progress-bar');
+  const secs    = sampleBeats * stepDur();
+
+  let stream;
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-  } catch (err) {
+    stream = await acquireMic();
+  } catch(err) {
     btn.disabled = false;
-    btn.textContent = '⏺ Record';
+    btn.textContent = recMode === 'hold' ? '⏺ Hold to Record' : '⏺ Record';
     timerEl.textContent = '';
-    timerEl.style.color = 'var(--accent)';
     alert('Microphone access denied. Please allow mic access and try again.');
     return;
   }
 
+  mediaStream = stream;
   recChunks = [];
   pendingBuffer = null;
 
-  // Live waveform
+  // Live waveform analyser
   const srcNode = AC.createMediaStreamSource(mediaStream);
   analyserNode = AC.createAnalyser();
   analyserNode.fftSize = 512;
   srcNode.connect(analyserNode);
   recAnimHandle = requestAnimationFrame(drawLiveWaveform);
 
-  mediaRecorder = new MediaRecorder(mediaStream, {
-    mimeType: ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg']
-      .find(t => MediaRecorder.isTypeSupported(t)) || ''
-  });
+  mediaRecorder = new MediaRecorder(mediaStream, (() => {
+    // Pick the first actually-supported type; empty string = browser default (safest on Android)
+    const preferred = [
+      'audio/ogg;codecs=opus',
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/ogg',
+    ];
+    const mime = preferred.find(t => MediaRecorder.isTypeSupported(t)) || '';
+    return mime ? { mimeType: mime } : {};
+  })());
   mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
   mediaRecorder.onstop = async () => {
     cancelAnimationFrame(recAnimHandle);
     if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
-    btn.textContent = '⏺ Record';
+    btn.textContent = recMode === 'hold' ? '⏺ Hold to Record' : '⏺ Record';
     btn.classList.remove('recording');
     btn.disabled = false;
     timerEl.style.color = 'var(--accent)';
+    timerEl.textContent = 'decoding…';
     try {
-      const blob = new Blob(recChunks);
+      // Use the exact mimeType the recorder used (critical on Android)
+      const mimeType = mediaRecorder.mimeType || '';
+      const blob = new Blob(recChunks, mimeType ? { type: mimeType } : {});
       const arrayBuf = await blob.arrayBuffer();
-      pendingBuffer = await AC.decodeAudioData(arrayBuf);
+      // Try decode — on Android a fresh AudioContext decodes more reliably
+      let decoded = null;
+      const tryDecode = (ctx) => new Promise((res, rej) => {
+        // Use callback form for broadest Android compatibility
+        ctx.decodeAudioData(arrayBuf.slice(0), res, rej);
+      });
+      try {
+        decoded = await tryDecode(AC);
+      } catch(e1) {
+        // Fallback: fresh throwaway AudioContext (Android WebView workaround)
+        try {
+          const ac2 = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+          decoded = await tryDecode(ac2);
+          ac2.close();
+        } catch(e2) {
+          throw e2;
+        }
+      }
+      pendingBuffer = decoded;
       drawBufferWaveform(pendingBuffer);
       document.getElementById('sm-confirm').disabled = false;
       document.getElementById('sm-play').disabled = false;
@@ -2044,10 +2303,11 @@ async function startRecording() {
   };
   mediaRecorder.start();
 
-  btn.textContent = '⏹ Stop';
+  btn.textContent = recMode === 'hold' ? '● Recording…' : '⏹ Stop';
   btn.classList.add('recording');
-  btn.disabled = false;
+  btn.disabled = (recMode === 'hold'); // hold mode: button is just visual, release = stop
   if (bar) bar.style.width = '0%';
+  timerEl.style.color = 'var(--accent)';
 
   let elapsed = 0;
   const tick = 50;
@@ -2063,12 +2323,143 @@ async function startRecording() {
 function stopRecording() {
   clearInterval(recTimerHandle);
   cancelAnimationFrame(recAnimHandle);
+  cancelAnimationFrame(holdRafHandle);
+  hideHoldRing();
   if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
   if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
   const btn = document.getElementById('sample-rec-btn');
-  if (btn) { btn.textContent = '⏺ Record'; btn.classList.remove('recording'); }
+  if (btn) {
+    btn.textContent = recMode === 'hold' ? '⏺ Hold to Record' : '⏺ Record';
+    btn.classList.remove('recording');
+    btn.disabled = false;
+  }
   analyserNode = null;
 }
+
+// ── Hold ring visual ──
+function showHoldRing(btnEl) {
+  const wrap = document.getElementById('hold-ring-wrap');
+  const arc  = document.getElementById('hold-arc');
+  const HOLD_FILL_MS = 600; // time to fill ring = trigger record
+
+  const rect = btnEl.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top  + rect.height / 2;
+  wrap.style.left   = (cx - 60) + 'px';
+  wrap.style.top    = (cy - 60) + 'px';
+  wrap.classList.add('visible');
+
+  const C = 2 * Math.PI * 52; // matches r="52"
+  arc.style.strokeDasharray  = C;
+  arc.style.strokeDashoffset = C;
+
+  holdStartTime = performance.now();
+  let triggered = false;
+
+  function animHold(now) {
+    const p = Math.min(1, (now - holdStartTime) / HOLD_FILL_MS);
+    arc.style.strokeDashoffset = C * (1 - p);
+    if (p >= 1 && !triggered) {
+      triggered = true;
+      hideHoldRing();
+      beginRecording();
+      return;
+    }
+    if (p < 1) holdRafHandle = requestAnimationFrame(animHold);
+  }
+  holdRafHandle = requestAnimationFrame(animHold);
+  return () => triggered; // getter
+}
+
+function hideHoldRing() {
+  cancelAnimationFrame(holdRafHandle);
+  document.getElementById('hold-ring-wrap').classList.remove('visible');
+  document.getElementById('hold-arc').style.strokeDashoffset =
+    '' + (2 * Math.PI * 52);
+}
+
+// ── TAP mode: button click → countdown → record ──
+function handleTapRecord() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    stopRecording();
+    return;
+  }
+  const btn = document.getElementById('sample-rec-btn');
+  btn.disabled = true;
+  btn.textContent = '…';
+  showCountdown(
+    () => { beginRecording(); },
+    () => { btn.disabled = false; btn.textContent = '⏺ Record'; }
+  );
+}
+
+// ── HOLD mode ──
+function handleHoldStart(e) {
+  if (recMode !== 'hold') return;
+  if (mediaRecorder && mediaRecorder.state === 'recording') return;
+  e.preventDefault();
+  showHoldRing(document.getElementById('sample-rec-btn'));
+}
+function handleHoldEnd(e) {
+  if (recMode !== 'hold') return;
+  e.preventDefault();
+  cancelAnimationFrame(holdRafHandle);
+  hideHoldRing();
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    stopRecording();
+  }
+}
+
+// ── Wire up button ──
+const recBtn = document.getElementById('sample-rec-btn');
+
+recBtn.addEventListener('click', (e) => {
+  if (recMode === 'tap') handleTapRecord();
+});
+
+// Touch events for hold mode (prevents ghost clicks on Android)
+recBtn.addEventListener('touchstart', (e) => {
+  if (recMode === 'hold') { handleHoldStart(e); }
+}, { passive: false });
+recBtn.addEventListener('touchend',   (e) => {
+  if (recMode === 'hold') handleHoldEnd(e);
+}, { passive: false });
+recBtn.addEventListener('touchcancel',(e) => {
+  if (recMode === 'hold') handleHoldEnd(e);
+}, { passive: false });
+// Mouse fallback for hold on desktop
+recBtn.addEventListener('mousedown', (e) => {
+  if (recMode === 'hold') handleHoldStart(e);
+});
+recBtn.addEventListener('mouseup', (e) => {
+  if (recMode === 'hold') handleHoldEnd(e);
+});
+recBtn.addEventListener('mouseleave', (e) => {
+  if (recMode === 'hold' && holdRafHandle) handleHoldEnd(e);
+});
+
+// Cancel in countdown overlay
+document.getElementById('countdown-cancel').addEventListener('click', () => {
+  countdownAbort = true;
+});
+
+// ── Mode toggle ──
+document.querySelectorAll('.rec-mode-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    recMode = b.dataset.mode;
+    document.querySelectorAll('.rec-mode-btn').forEach(x => x.classList.toggle('active', x === b));
+    const hint = document.getElementById('rec-mode-hint');
+    const recBtnEl = document.getElementById('sample-rec-btn');
+    if (recMode === 'hold') {
+      hint.textContent = 'hold to record, release to stop';
+      recBtnEl.textContent = '⏺ Hold to Record';
+    } else {
+      hint.textContent = 'tap to start/stop';
+      recBtnEl.textContent = '⏺ Record';
+    }
+    stopRecording();
+  });
+});
 
 document.getElementById('sm-play').addEventListener('click', () => {
   if (!pendingBuffer) return;
@@ -2077,14 +2468,6 @@ document.getElementById('sm-play').addEventListener('click', () => {
   src.buffer = pendingBuffer;
   src.connect(masterGain);
   src.start(AC.currentTime);
-});
-
-document.getElementById('sample-rec-btn').addEventListener('click', () => {
-  if (mediaRecorder && mediaRecorder.state === 'recording') {
-    stopRecording();
-  } else {
-    startRecording();
-  }
 });
 
 document.querySelectorAll('.sm-len').forEach(btn => {
