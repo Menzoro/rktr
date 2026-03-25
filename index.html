@@ -70,7 +70,7 @@ body{
   display:flex;
   align-items:center;
   gap:8px;
-  padding:6px 10px;
+  padding:3px 10px;
   background:var(--s1);
   border-bottom:1px solid var(--border);
   flex-shrink:0;
@@ -231,6 +231,13 @@ body{
   min-height:0;
   align-items:stretch;
 }
+.band-rec-col{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+  width:58px;
+}
 .band-label{
   width:58px;
   position:relative;
@@ -323,12 +330,28 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   flex-shrink:0;
   transition:background 0.15s;
 }
+#synth-toggle-bar.hidden{ display:none; }
 #synth-toggle-bar:hover{background:var(--s2);}
 .stb-left{display:flex;align-items:center;gap:8px;}
 .stb-inst-name{font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;}
 .stb-hint{font-size:9px;color:var(--muted);}
 .stb-arrow{font-size:10px;color:var(--muted);transition:transform 0.25s;}
 .stb-arrow.open{transform:rotate(180deg);}
+
+/* ── SYNTH CLOSE BUTTON (inside panel) ── */
+#synth-close-btn{
+  background:none;
+  border:1px solid var(--border);
+  border-radius:3px;
+  color:var(--muted);
+  font-size:11px;
+  padding:2px 7px;
+  cursor:pointer;
+  flex-shrink:0;
+  touch-action:manipulation;
+  transition:color 0.12s, border-color 0.12s;
+}
+#synth-close-btn:active{ color:var(--text); border-color:var(--muted); }
 
 /* ── SYNTH PANEL ── */
 #synth-panel{
@@ -347,10 +370,11 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   gap:8px;
 }
 .synth-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
-.param{display:flex;flex-direction:column;gap:3px;min-width:72px;flex:1;}
+.param{display:flex;flex-direction:column;gap:2px;min-width:72px;flex:1;}
+.param-header{display:flex;align-items:baseline;justify-content:space-between;gap:4px;}
 .param label{font-size:8px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;}
-.param input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer;}
-.param .pval{font-size:10px;color:var(--text);font-weight:700;}
+.param input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer;margin:0;}
+.param .pval{font-size:9px;color:var(--text);font-weight:700;}
 .synth-actions{display:flex;gap:6px;align-items:center;flex-shrink:0;}
 .prev-btn{
   background:var(--s2);
@@ -533,11 +557,22 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   position:relative;font-size:10px;font-weight:700;
   letter-spacing:0.08em;text-transform:uppercase;
   color:var(--muted);cursor:pointer;border:1px solid var(--border);
-  border-radius:2px;padding:4px 8px;margin-top:1px;
+  border-radius:4px;padding:0;
+  width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
   background:var(--s2);z-index:1;transition:all 0.12s;
   touch-action:manipulation;
 }
 .inst-rec.sampled{color:var(--accent);border-color:var(--accent);}
+.rec-mode-btn{
+  padding:4px 10px;
+  font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;
+  letter-spacing:0.1em;text-transform:uppercase;
+  border:none;background:var(--s2);color:var(--muted);
+  cursor:pointer;transition:all 0.12s;touch-action:manipulation;
+}
+.rec-mode-btn.active{background:var(--s3);color:var(--accent);}
+.rec-mode-btn:not(:last-child){border-right:1px solid var(--border);}
 .inst-rec.live-recording{
   color:#fff;
   background:#e03030;
@@ -641,28 +676,41 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   <!-- SAMPLE MODAL -->
   <div id="sample-modal">
     <div id="sample-box">
-      <div class="sm-title" id="sm-title">Sample — KICK</div>
-      <div class="sm-lengths">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="sm-title" id="sm-title">Sample — KICK</div>
+        <div id="rec-mode-toggle" style="display:flex;border:1px solid var(--border);border-radius:3px;overflow:hidden;">
+          <button class="rec-mode-btn active" data-recmode="tape">TAPE</button>
+          <button class="rec-mode-btn" data-recmode="crop">CROP</button>
+        </div>
+      </div>
+      <!-- TAPE mode lengths (hidden in crop mode) -->
+      <div class="sm-lengths" id="sm-tape-lengths">
         <button class="sm-len active" data-beats="1">1 step</button>
         <button class="sm-len" data-beats="2">2 steps</button>
         <button class="sm-len" data-beats="4">1 beat</button>
         <button class="sm-len" data-beats="8">2 beats</button>
         <button class="sm-len" data-beats="16">1 bar</button>
       </div>
+      <!-- CROP mode: crop window selector (hidden in tape mode) -->
+      <div id="sm-crop-lengths" style="display:none;">
+        <div style="font-size:9px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;">Crop window</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="sm-len active" data-cropbeats="1">1 step</button>
+          <button class="sm-len" data-cropbeats="2">2 steps</button>
+          <button class="sm-len" data-cropbeats="4">1 beat</button>
+        </div>
+      </div>
       <!-- Scrolling waveform canvas — taller, full-width -->
       <div id="sm-canvas-wrap" style="position:relative;width:100%;border-radius:6px;overflow:hidden;border:1px solid var(--border);background:#18182a;">
         <canvas id="sample-canvas" style="width:100%;height:110px;display:block;"></canvas>
-        <!-- rec zone tint overlay (right half, pointer-events:none) -->
         <div id="sm-rec-tint"></div>
-        <!-- center divider line -->
         <div id="sm-center-line"></div>
-        <!-- playhead -->
         <div id="sm-playhead"></div>
-        <!-- labels -->
         <div id="sm-label-pre">PRE-ROLL</div>
         <div id="sm-label-rec">● REC</div>
+        <!-- Crop handles (visible in crop mode after recording) -->
+        <div id="sm-crop-region" style="display:none;position:absolute;top:0;bottom:0;background:rgba(0,229,200,0.12);border-left:2px solid var(--accent);border-right:2px solid var(--accent);pointer-events:none;"></div>
       </div>
-      <!-- status row -->
       <div style="display:flex;align-items:center;gap:8px;">
         <div id="sample-timer" style="flex:1;font-size:15px;font-weight:700;color:var(--muted);font-family:'JetBrains Mono',monospace;min-height:22px;letter-spacing:0.06em;"></div>
       </div>
@@ -681,12 +729,12 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   <!-- STEP INDICATOR -->
   <div id="step-indicator"><div id="step-cursor"></div></div>
 
-  <!-- SYNTH TOGGLE -->
+  <!-- SYNTH TOGGLE (hidden when panel open) -->
   <div id="synth-toggle-bar">
     <div class="stb-left">
       <span class="stb-arrow" id="stb-arrow">▲</span>
       <span class="stb-inst-name" id="stb-name">KICK</span>
-      <span class="stb-hint">tap to edit synth</span>
+      <span class="stb-hint" id="stb-hint">tap to edit synth</span>
     </div>
     <span style="font-size:9px;color:var(--muted)">SYNTH</span>
   </div>
@@ -1030,6 +1078,10 @@ function scheduleStep(step, t) {
 function scheduler() {
   while (nextStepTime < AC.currentTime + LOOKAHEAD) {
     scheduleStep(currentPos, nextStepTime);
+    // Resync seqStartTime every time we wrap to step 0 to prevent drift
+    if (currentPos === 0) {
+      seqStartTime = nextStepTime;
+    }
     currentPos = (currentPos + 1) % steps;
     nextStepTime += stepDur();
   }
@@ -1205,14 +1257,14 @@ function renderBand(instId) {
     cx.fill();
     cx.globalAlpha = 1;
 
-    // Step label
+    // Step label — top right
     if (stepW > 16) {
       cx.fillStyle = col;
       cx.globalAlpha = 0.6;
       cx.font = `bold ${Math.min(9, stepW * 0.42)}px 'JetBrains Mono', monospace`;
-      cx.textAlign = 'center';
-      cx.textBaseline = 'bottom';
-      cx.fillText(n.step + 1, x + durW * 0.5, h - 1);
+      cx.textAlign = 'right';
+      cx.textBaseline = 'top';
+      cx.fillText(n.step + 1, x + durW - 2, 2);
       cx.globalAlpha = 1;
     }
     cx.globalAlpha = 1;
@@ -1646,11 +1698,16 @@ function buildBands() {
       <div class="vol-fill" id="volfill-${inst.id}" style="background:${inst.color};height:${instVol[inst.id]*100}%"></div>
       <span class="inst-name">${inst.name}</span>
       <span class="inst-yparam" id="yparam-ind-${inst.id}" style="display:${instYParam[inst.id] && instYParam[inst.id]!=='none' ? 'block' : 'none'};color:${inst.color}">${instYParam[inst.id] && instYParam[inst.id]!=='none' ? instYParam[inst.id].toUpperCase() : ''}</span>
-      <span class="inst-rec${instSamples[inst.id] ? ' sampled' : ''}" id="rec-${inst.id}">⏺</span>
     `;
 
-    // REC button: tap → modal, hold → live record (release to stop)
-    const recBtn = lbl.querySelector('.inst-rec');
+    // Standalone rec button column
+    const recCol = document.createElement('div');
+    recCol.className = 'band-rec-col';
+    const recBtn = document.createElement('span');
+    recBtn.className = 'inst-rec' + (instSamples[inst.id] ? ' sampled' : '');
+    recBtn.id = 'rec-' + inst.id;
+    recBtn.textContent = '⏺';
+    recCol.appendChild(recBtn);
     recBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
     recBtn.addEventListener('pointermove', (e) => e.stopPropagation());
 
@@ -1781,6 +1838,7 @@ function buildBands() {
     canvas.className = 'band-cv';
     canvas.id = 'cv-' + inst.id;
     wrap.appendChild(canvas);
+    row.appendChild(recCol);
     row.appendChild(lbl);
     row.appendChild(wrap);
     container.appendChild(row);
@@ -1864,7 +1922,9 @@ function renderSynthPanel() {
   const presets = PRESETS[selectedInst] || [];
 
   inner.innerHTML = `
-    <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:6px;">
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+      <button id="synth-close-btn" title="Close">▼</button>
+      <span style="font-size:10px;font-weight:700;letter-spacing:0.12em;color:${inst.color}">${inst.name}</span>
       <div style="display:flex;gap:4px;flex-wrap:wrap;flex:1;">
         ${presets.map((pr, i) => `
           <button class="preset-btn" data-idx="${i}">${pr.name}</button>
@@ -1878,13 +1938,15 @@ function renderSynthPanel() {
     <div class="synth-row">
       ${defs.map(d => `
         <div class="param">
-          <label>${d.l}</label>
+          <div class="param-header">
+            <label>${d.l}</label>
+            <span class="pval" id="pv-${selectedInst}-${d.k}">${fmtParam(d.min, d.max, params[d.k], d.fmt)}</span>
+          </div>
           <input type="range"
             min="${d.min}" max="${d.max}" step="${d.step}"
             value="${params[d.k] !== undefined ? params[d.k] : d.min}"
             data-inst="${selectedInst}" data-key="${d.k}"
             data-min="${d.min}" data-max="${d.max}" data-fmt="${d.fmt || ''}">
-          <span class="pval" id="pv-${selectedInst}-${d.k}">${fmtParam(d.min, d.max, params[d.k], d.fmt)}</span>
         </div>
       `).join('')}
     </div>
@@ -1893,6 +1955,8 @@ function renderSynthPanel() {
   inner.querySelectorAll('.preset-btn').forEach(btn => {
     btn.addEventListener('click', () => applyPreset(selectedInst, presets[+btn.dataset.idx]));
   });
+
+  document.getElementById('synth-close-btn').addEventListener('click', toggleSynthPanel);
 
   inner.querySelectorAll('input[type=range]').forEach(inp => {
     inp.addEventListener('input', function () {
@@ -2077,6 +2141,11 @@ async function startLiveRecord(instId, btn) {
     return;
   }
 
+  // Capture which step we're starting on (snapped to next step boundary)
+  const delayMs = isPlaying ? Math.max(0, (nextStepTime - AC.currentTime) * 1000) : 0;
+  // The step that will be playing when recording actually starts
+  const startStep = isPlaying ? (currentPos % steps) : 0;
+
   const chunks = [];
   const mr = new MediaRecorder(stream, (() => {
     const preferred = ['audio/ogg;codecs=opus','audio/webm;codecs=opus','audio/webm','audio/ogg'];
@@ -2099,19 +2168,24 @@ async function startLiveRecord(instId, btn) {
         decoded = await tryDecode(ac2);
         ac2.close();
       }
+      const durSteps = Math.max(1, Math.round(decoded.duration / stepDur()));
       instSamples[instId] = decoded;
-      instSampleBeats[instId] = Math.max(1, Math.round(decoded.duration / stepDur()));
+      instSampleBeats[instId] = durSteps;
       btn.classList.add('sampled');
+
+      // Auto-place note at the step where recording started
+      if (isPlaying || startStep > 0) {
+        const ns = notes[instId] || [];
+        // Remove any existing note at that step
+        notes[instId] = ns.filter(n => n.step !== startStep);
+        notes[instId].push({ step: startStep, vel: 0.9, dur: durSteps });
+        renderAll();
+      }
     } catch(err) {
       console.error('Live rec decode failed', err);
     }
     liveRec[instId] = null;
   };
-
-  // Snap start to next step boundary if sequencer is running
-  const delayMs = isPlaying
-    ? Math.max(0, (nextStepTime - AC.currentTime) * 1000)
-    : 0;
 
   liveRec[instId] = { active: true, mr, stream };
   btn.classList.add('live-recording');
@@ -2178,25 +2252,23 @@ function openSampleModal(instId) {
   document.getElementById('sample-timer').style.color = 'var(--muted)';
   document.getElementById('sm-confirm').disabled = true;
   document.getElementById('sm-play').disabled = true;
+  // Reset mode to tape
+  recMode = 'tape';
+  cropOffsetSec = 0;
+  cropBeats = 1;
+  document.querySelectorAll('.rec-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.recmode === 'tape'));
+  document.getElementById('sm-tape-lengths').style.display = '';
+  document.getElementById('sm-crop-lengths').style.display = 'none';
+  document.getElementById('sm-crop-region').style.display = 'none';
+  document.querySelectorAll('[data-cropbeats]').forEach(b => b.classList.toggle('active', +b.dataset.cropbeats === 1));
   document.querySelectorAll('.sm-len').forEach(b => b.classList.toggle('active', +b.dataset.beats === sampleBeats));
   document.getElementById('sample-modal').classList.add('visible');
-  // Size canvas after layout settles, then position overlays
   setTimeout(() => {
     const cv = getTapeCanvas();
     const cx = cv.getContext('2d');
     cx.fillStyle = '#18182a';
     cx.fillRect(0, 0, cv.width, cv.height);
-    // preroll = 2 quarter notes, rec = sampleBeats 16th notes
-    const stepSec = 60 / bpm / 4;
-    const prerollSecs = 2 * (60 / bpm);
-    const recSecs = sampleBeats * stepSec;
-    const frac = prerollSecs / (prerollSecs + recSecs);
-    const midX = Math.round(cv.width * frac);
-    document.getElementById('sm-center-line').style.left = midX + 'px';
-    document.getElementById('sm-rec-tint').style.left = midX + 'px';
-    document.getElementById('sm-rec-tint').style.width = (cv.width - midX) + 'px';
-    document.getElementById('sm-rec-tint').style.right = 'auto';
-    updatePlayhead(0, midX);
+    updatePlayhead(0);
   }, 40);
 }
 
@@ -2245,15 +2317,21 @@ async function startTape() {
   tapeSecs = prerollSecs + tapeRecSecs;
 
   const cv = getTapeCanvas();
-  // midX is proportional: preroll takes prerollSecs/tapeSecs of canvas width
   const prerollFrac = prerollSecs / tapeSecs;
+  const midX = Math.round(cv.width * prerollFrac);
   tapeSamples = new Float32Array(cv.width).fill(0);
   tapePos = 0;
   tapeActive = true;
   tapeRecording = false;
   tapeStartTime = performance.now();
-  // Store preroll fraction for drawTapeLoop
   tapePrerollFrac = prerollFrac;
+
+  // Set overlays precisely from actual canvas width
+  document.getElementById('sm-center-line').style.left = midX + 'px';
+  document.getElementById('sm-rec-tint').style.left = midX + 'px';
+  document.getElementById('sm-rec-tint').style.width = (cv.width - midX) + 'px';
+  document.getElementById('sm-rec-tint').style.opacity = '';  // restore visibility
+  document.getElementById('sm-playhead').style.display = '';
 
   btn.textContent = '● Pre-roll…';
   btn.className = 'preroll';
@@ -2292,12 +2370,15 @@ async function startTape() {
       drawBufferWaveform(pendingBuffer);
       document.getElementById('sm-confirm').disabled = false;
       document.getElementById('sm-play').disabled = false;
+      document.getElementById('sm-rec-tint').style.opacity = '0'; // hide tint after recording
       timerEl.textContent = pendingBuffer.duration.toFixed(2) + 's recorded';
       timerEl.style.color = 'var(--accent)';
       const btn2 = document.getElementById('sample-rec-btn');
       btn2.textContent = '⏺ Re-record';
       btn2.className = '';
       btn2.disabled = false;
+      // Show crop region if in crop mode
+      if (recMode === 'crop') { cropOffsetSec = 0; updateCropRegion(); }
     } catch(err) {
       document.getElementById('sample-timer').textContent = 'decode error :(';
       console.error('decode failed', err);
@@ -2308,6 +2389,99 @@ async function startTape() {
     }
   };
 
+  drawTapeLoop();
+}
+
+// ── Crop mode: record immediately, no pre-roll ────────────────────
+async function startCropRecord() {
+  const btn = document.getElementById('sample-rec-btn');
+  const timerEl = document.getElementById('sample-timer');
+  btn.disabled = true;
+  btn.textContent = 'opening mic…';
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  } catch(err) {
+    btn.disabled = false;
+    btn.textContent = '⏺ Start';
+    alert('Microphone access denied.');
+    return;
+  }
+  mediaStream = stream;
+
+  // Hide tape overlays — not needed in crop mode
+  document.getElementById('sm-center-line').style.display = 'none';
+  document.getElementById('sm-rec-tint').style.display = 'none';
+  document.getElementById('sm-label-pre').style.display = 'none';
+  document.getElementById('sm-label-rec').style.display = 'none';
+  document.getElementById('sm-playhead').style.display = 'none';
+
+  // Set up live waveform analyser
+  const srcNode = AC.createMediaStreamSource(mediaStream);
+  analyserNode = AC.createAnalyser();
+  analyserNode.fftSize = 256;
+  srcNode.connect(analyserNode);
+
+  const recSecs = sampleBeats * (60 / bpm / 4); // sampleBeats=8 = 2 beats
+  tapeActive = true;
+  tapeRecording = true;
+  tapeStartTime = performance.now();
+  tapeSamples = new Float32Array((getTapeCanvas().width)).fill(0);
+  tapePrerollFrac = 0; // whole canvas = rec
+
+  recChunks = [];
+  mediaRecorder = new MediaRecorder(mediaStream, (() => {
+    const preferred = ['audio/ogg;codecs=opus','audio/webm;codecs=opus','audio/webm','audio/ogg'];
+    const mime = preferred.find(t => MediaRecorder.isTypeSupported(t)) || '';
+    return mime ? { mimeType: mime } : {};
+  })());
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
+  mediaRecorder.onstop = async () => {
+    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+    timerEl.textContent = 'decoding…';
+    timerEl.style.color = 'var(--muted)';
+    try {
+      const mimeType = mediaRecorder.mimeType || '';
+      const blob = new Blob(recChunks, mimeType ? { type: mimeType } : {});
+      const arrayBuf = await blob.arrayBuffer();
+      const tryDecode = (ctx) => new Promise((res, rej) => ctx.decodeAudioData(arrayBuf.slice(0), res, rej));
+      let decoded;
+      try { decoded = await tryDecode(AC); }
+      catch(e1) {
+        const ac2 = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+        decoded = await tryDecode(ac2);
+        ac2.close();
+      }
+      pendingBuffer = decoded;
+      drawBufferWaveform(pendingBuffer);
+      document.getElementById('sm-confirm').disabled = false;
+      document.getElementById('sm-play').disabled = false;
+      timerEl.textContent = pendingBuffer.duration.toFixed(2) + 's — drag to select';
+      timerEl.style.color = 'var(--accent)';
+      btn.textContent = '⏺ Re-record';
+      btn.className = '';
+      btn.disabled = false;
+      cropOffsetSec = 0;
+      updateCropRegion();
+    } catch(err) {
+      timerEl.textContent = 'decode error :(';
+      btn.textContent = '⏺ Retry';
+      btn.className = '';
+      btn.disabled = false;
+    }
+    tapeActive = false;
+  };
+
+  mediaRecorder.start(100);
+  btn.textContent = '⏹ Stop';
+  btn.className = 'recording';
+  btn.disabled = false;
+  timerEl.style.color = '#e03030';
+
+  // Drive live waveform and timer using the existing tape draw loop
+  tapeRecSecs = recSecs;
+  tapeSecs = recSecs;
   drawTapeLoop();
 }
 
@@ -2340,10 +2514,6 @@ function drawTapeLoop() {
     btn.textContent = '⏹ Stop';
     btn.className = 'recording';
     document.getElementById('sample-timer').style.color = '#e03030';
-    // Update center line position to match actual midX
-    document.getElementById('sm-center-line').style.left = midX + 'px';
-    document.getElementById('sm-rec-tint').style.left = midX + 'px';
-    document.getElementById('sm-rec-tint').style.width = (w - midX) + 'px';
   }
 
   // Update timer display
@@ -2363,7 +2533,7 @@ function drawTapeLoop() {
   for (let i = 0; i < Math.floor(xPx); i++) {
     const amp = tapeSamples[i] || 0;
     const barH = Math.max(2, amp * (h - 8));
-    const inRec = i >= midX;
+    const inRec = recMode === 'crop' || i >= midX;
     cx.fillStyle = inRec ? 'rgba(0,229,200,0.75)' : 'rgba(100,100,140,0.5)';
     cx.fillRect(i, (h - barH) / 2, 1, barH);
   }
@@ -2429,36 +2599,113 @@ document.getElementById('sample-rec-btn').addEventListener('click', () => {
   if (tapeActive) {
     stopTape();
   } else {
-    // Reset playhead visibility
     document.getElementById('sm-playhead').style.display = '';
-    startTape();
+    if (recMode === 'crop') {
+      startCropRecord();
+    } else {
+      startTape();
+    }
   }
 });
 
+
+document.querySelectorAll('.sm-len').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (tapeActive) return;
+    if (!btn.dataset.beats) return;
+    sampleBeats = +btn.dataset.beats;
+    document.querySelectorAll('[data-beats]').forEach(b => b.classList.toggle('active', +b.dataset.beats === sampleBeats));
+  });
+});
+
+// ── Crop mode ──
+let recMode = 'tape';  // 'tape' | 'crop'
+let cropBeats = 1;     // selected crop window in steps
+let cropOffsetSec = 0; // draggable start offset within the recorded buffer
+
+document.querySelectorAll('.rec-mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (tapeActive) return;
+    recMode = btn.dataset.recmode;
+    document.querySelectorAll('.rec-mode-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.getElementById('sm-tape-lengths').style.display = recMode === 'tape' ? '' : 'none';
+    document.getElementById('sm-crop-lengths').style.display = recMode === 'crop' ? '' : 'none';
+    document.getElementById('sm-crop-region').style.display = 'none';
+    // Show/hide tape overlays
+    const showTape = recMode === 'tape';
+    document.getElementById('sm-center-line').style.display = showTape ? '' : 'none';
+    document.getElementById('sm-rec-tint').style.display = showTape ? '' : 'none';
+    document.getElementById('sm-label-pre').style.display = showTape ? '' : 'none';
+    document.getElementById('sm-label-rec').style.display = showTape ? '' : 'none';
+    // Crop mode always records 2 beats
+    if (recMode === 'crop') {
+      sampleBeats = 8; // 8 steps = 2 beats, the full crop window
+      updateCropRegion();
+    }
+  });
+});
+
+document.querySelectorAll('[data-cropbeats]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    cropBeats = +btn.dataset.cropbeats;
+    document.querySelectorAll('[data-cropbeats]').forEach(b => b.classList.toggle('active', b === btn));
+    cropOffsetSec = 0; // reset offset when window size changes
+    updateCropRegion();
+  });
+});
+
+function updateCropRegion() {
+  if (recMode !== 'crop' || !pendingBuffer) return;
+  const cv = getTapeCanvas();
+  const w = cv.width;
+  const totalSec = pendingBuffer.duration;
+  const windowSec = cropBeats * (60 / bpm / 4);
+  // Clamp offset
+  cropOffsetSec = Math.max(0, Math.min(totalSec - windowSec, cropOffsetSec));
+  const startFrac = cropOffsetSec / totalSec;
+  const widthFrac = Math.min(1, windowSec / totalSec);
+  const region = document.getElementById('sm-crop-region');
+  region.style.display = '';
+  region.style.left = (startFrac * 100) + '%';
+  region.style.width = (widthFrac * 100) + '%';
+}
+
+// Drag crop region on canvas
+let cropDragging = false;
+let cropDragStartX = 0;
+let cropDragStartOffset = 0;
+const smWrap = document.getElementById('sm-canvas-wrap');
+smWrap.addEventListener('pointerdown', (e) => {
+  if (recMode !== 'crop' || !pendingBuffer || tapeActive) return;
+  cropDragging = true;
+  cropDragStartX = e.clientX;
+  cropDragStartOffset = cropOffsetSec;
+  smWrap.setPointerCapture(e.pointerId);
+});
+smWrap.addEventListener('pointermove', (e) => {
+  if (!cropDragging || !pendingBuffer) return;
+  const w = smWrap.offsetWidth;
+  const dx = e.clientX - cropDragStartX;
+  const dSec = (dx / w) * pendingBuffer.duration;
+  cropOffsetSec = cropDragStartOffset + dSec;
+  updateCropRegion();
+});
+smWrap.addEventListener('pointerup', () => { cropDragging = false; });
+smWrap.addEventListener('pointercancel', () => { cropDragging = false; });
+
+// Play preview of crop window
 document.getElementById('sm-play').addEventListener('click', () => {
   if (!pendingBuffer) return;
   resumeAC();
   const src = AC.createBufferSource();
   src.buffer = pendingBuffer;
   src.connect(masterGain);
-  src.start(AC.currentTime);
-});
-
-document.querySelectorAll('.sm-len').forEach(btn => {
-  btn.addEventListener('click', () => {
-    if (tapeActive) return; // don't change mid-recording
-    sampleBeats = +btn.dataset.beats;
-    document.querySelectorAll('.sm-len').forEach(b => b.classList.toggle('active', +b.dataset.beats === sampleBeats));
-    // Reposition center line
-    const cv = getTapeCanvas();
-    const stepSec = 60 / bpm / 4;
-    const prerollSecs = 2 * (60 / bpm);
-    const frac = prerollSecs / (prerollSecs + sampleBeats * stepSec);
-    const midX = Math.round(cv.width * frac);
-    document.getElementById('sm-center-line').style.left = midX + 'px';
-    document.getElementById('sm-rec-tint').style.left = midX + 'px';
-    document.getElementById('sm-rec-tint').style.width = (cv.width - midX) + 'px';
-  });
+  if (recMode === 'crop') {
+    const windowSec = cropBeats * (60 / bpm / 4);
+    src.start(AC.currentTime, cropOffsetSec, windowSec);
+  } else {
+    src.start(AC.currentTime);
+  }
 });
 
 document.getElementById('sm-cancel').addEventListener('click', () => {
@@ -2467,8 +2714,29 @@ document.getElementById('sm-cancel').addEventListener('click', () => {
 
 document.getElementById('sm-confirm').addEventListener('click', () => {
   if (!pendingBuffer || !sampleInstId) return;
-  instSamples[sampleInstId] = pendingBuffer;
-  instSampleBeats[sampleInstId] = sampleBeats;
+  let finalBuffer = pendingBuffer;
+  let finalBeats = sampleBeats;
+
+  if (recMode === 'crop') {
+    // Trim the buffer to the crop window
+    const sampleRate = pendingBuffer.sampleRate;
+    const windowSec = cropBeats * (60 / bpm / 4);
+    const startSample = Math.floor(cropOffsetSec * sampleRate);
+    const windowSamples = Math.floor(windowSec * sampleRate);
+    const endSample = Math.min(startSample + windowSamples, pendingBuffer.length);
+    const length = endSample - startSample;
+    if (length > 0) {
+      const trimmed = AC.createBuffer(pendingBuffer.numberOfChannels, length, sampleRate);
+      for (let ch = 0; ch < pendingBuffer.numberOfChannels; ch++) {
+        trimmed.getChannelData(ch).set(pendingBuffer.getChannelData(ch).subarray(startSample, endSample));
+      }
+      finalBuffer = trimmed;
+      finalBeats = cropBeats;
+    }
+  }
+
+  instSamples[sampleInstId] = finalBuffer;
+  instSampleBeats[sampleInstId] = finalBeats;
   const recBtn = document.getElementById('rec-' + sampleInstId);
   if (recBtn) recBtn.classList.add('sampled');
   closeSampleModal();
@@ -2582,13 +2850,16 @@ document.addEventListener('fullscreenchange', () => {
   document.getElementById('fs-btn').textContent = document.fullscreenElement ? '✕' : '⛶';
 });
 
-document.getElementById('synth-toggle-bar').addEventListener('click', () => {
-  const panel = document.getElementById('synth-panel');
-  const arrow = document.getElementById('stb-arrow');
+const synthToggleBar = document.getElementById('synth-toggle-bar');
+
+function toggleSynthPanel() {
+  const panel  = document.getElementById('synth-panel');
   const isOpen = panel.classList.toggle('open');
-  arrow.classList.toggle('open', isOpen);
+  synthToggleBar.classList.toggle('hidden', isOpen);
   if (isOpen) renderSynthPanel();
-});
+}
+
+synthToggleBar.addEventListener('click', toggleSynthPanel);
 
 // ─── Init ─────────────────────────────────────────────────────────
 buildBands();
