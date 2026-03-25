@@ -254,6 +254,7 @@ body{
   background:var(--s2);
   cursor:pointer;
   transition:border-color 0.15s;
+  touch-action: none;
 }
 .band-label.selected{border-color:currentColor;}
 .band-label .vol-fill{
@@ -760,7 +761,13 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
 </div>
 
 <script>
-// ─── Audio Context ───────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// MODULE: AUDIO CONTEXT & SHARED STATE
+// Owns: AudioContext, masterGain, transport globals, instrument list,
+//       notes array, mute flags, and per-instrument runtime state.
+// Future split: audio-context.js + state.js  (or a single store.js)
+// ═══════════════════════════════════════════════════════════════════
+
 const AC = new (window.AudioContext || window.webkitAudioContext)();
 const masterGain = AC.createGain();
 masterGain.gain.value = 0.85;
@@ -770,19 +777,23 @@ function resumeAC() { if (AC.state === 'suspended') AC.resume(); }
 document.addEventListener('click', resumeAC);
 document.addEventListener('touchstart', resumeAC, { passive: true });
 
-// ─── State ───────────────────────────────────────────────────────
-let bpm = 120;
-let steps = 16;
-let isPlaying = false;
-let quantOn = false;
-let swing = 0;
+// ── Transport ──────────────────────────────────────────────────────
+let bpm    = 120;
+let steps  = 16;
+let swing  = 0;
 let glowOn = true;
-let currentPos = 0;  // in full steps, advances by 0.5
-let nextStepTime = 0;
-let timerID = null;
-const LOOKAHEAD = 0.08;
-const SCHED_INTERVAL = 20;
+let isPlaying = false;
+let quantOn   = false;    // reserved for future quantise-to-grid feature
 
+// Scheduler internals (owned by Sequencer module, declared here for shared access)
+let currentPos   = 0;
+let nextStepTime = 0;
+let timerID      = null;
+const LOOKAHEAD      = 0.08;   // seconds ahead to schedule audio
+const SCHED_INTERVAL = 20;     // ms between scheduler ticks
+
+// ── Instrument definitions ─────────────────────────────────────────
+// Order = top-to-bottom render order in the band grid
 const INSTRUMENTS = [
   { id: 'hihat', name: 'HIHAT', color: '#ffe040' },
   { id: 'tom',   name: 'TOM',   color: '#2dffa0' },
@@ -790,13 +801,23 @@ const INSTRUMENTS = [
   { id: 'kick',  name: 'KICK',  color: '#ff5e2a' },
 ];
 
-// notes[instId] = [{step, vel, dur}]  vel:0-1, dur:steps
+// ── Note data ──────────────────────────────────────────────────────
+// notes[instId] = [{ step, vel:0-1, dur:steps, yVal?, entangled? }]
 const notes = { kick:[], snare:[], hihat:[], tom:[] };
-const muted = { kick:false, snare:false, hihat:false, tom:false };
+const muted  = { kick:false, snare:false, hihat:false, tom:false };
 
+// ── UI selection state ─────────────────────────────────────────────
 let selectedInst = 'kick';
 
-// ─── Synth Parameters ────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// MODULE: SYNTH DATA
+// Owns: per-instrument parameter defaults (SP), parameter metadata
+//       (SYNTH_DEFS), factory presets (PRESETS), and scene presets
+//       (SCENE_PRESETS).
+// Future split: synth-data.js  (pure data, no DOM/audio deps)
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Live parameter values (mutated by synth panel sliders) ─────────
 const SP = {
   kick:  { pitch:52, sweep:4, punch:0.75, body:0.65, decay:0.55, drive:0.18, click:0.4, sub:0.3 },
   snare: { pitch:185, decay:0.16, snap:0.55, noise:0.65, tone:0.38, crack:0.3, tune:0.5 },
@@ -804,6 +825,7 @@ const SP = {
   tom:   { pitch:85, sweep:8,  body:0.6, decay:0.32, attack:0.008, drive:0.0 },
 };
 
+// ── Parameter metadata (drives synth panel UI) ─────────────────────
 const SYNTH_DEFS = {
   kick:  [
     { k:'pitch', l:'Pitch',  min:28,   max:110,   step:1    },
@@ -842,7 +864,15 @@ const SYNTH_DEFS = {
   ],
 };
 
-// ─── Sound Engines ────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// MODULE: AUDIO ENGINE
+// Owns: all synthesis functions (mkDist, playKick/Snare/Hihat/Tom),
+//       sample playback (playSample), and the unified trigger
+//       dispatcher (triggerInst).
+// Future split: audio-engine.js  (depends only on AC + masterGain)
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Distortion waveshaper factory ─────────────────────────────────
 function mkDist(k) {
   const ws = AC.createWaveShaper();
   const n = 256, c = new Float32Array(n);
@@ -865,6 +895,7 @@ function mkDist(k) {
   return ws;
 }
 
+// ── Synth voice functions ──────────────────────────────────────────
 function playKick(t, vel = 1, overrides = {}) {
   const p = { ...SP.kick, ...overrides };
   // Main body oscillator
@@ -1010,8 +1041,9 @@ function playTom(t, vel = 1, overrides = {}) {
 
 function velCurve(v) { return Math.pow(v, 2.2); }
 
-// ─── Sample Engine ────────────────────────────────────────────────
-const instSamples = { kick:null, snare:null, hihat:null, tom:null };
+// ── Sample engine ──────────────────────────────────────────────────
+// instSamples: decoded AudioBuffers recorded by the user (null = use synth)
+const instSamples     = { kick:null, snare:null, hihat:null, tom:null };
 const instSampleBeats = { kick:2, snare:2, hihat:2, tom:2 };
 
 function playSample(id, t, vel, dur) {
@@ -1042,6 +1074,8 @@ function playSample(id, t, vel, dur) {
   src.start(t); src.stop(t + playDur + 0.01);
 }
 
+// ── Trigger dispatcher ─────────────────────────────────────────────
+// Single entry point: routes to sample or synth voice, applies mute + vol.
 function triggerInst(id, t, vel, dur, overrides = {}) {
   if (muted[id]) return;
   if (instSamples[id]) { playSample(id, t, vel, dur); return; }
@@ -1052,7 +1086,16 @@ function triggerInst(id, t, vel, dur, overrides = {}) {
   else if (id === 'tom')   playTom(t, v, overrides);
 }
 
-// ─── Sequencer ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// MODULE: SEQUENCER
+// Owns: step scheduling (scheduler, scheduleStep), transport control
+//       (startSeq, stopSeq), and the visual sync tick (visualTick).
+// Reads: notes, steps, bpm, swing, instYParam/Range from shared state.
+// Writes: currentPos, nextStepTime, timerID, visualRaf.
+// Future split: sequencer.js
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Step duration helper ───────────────────────────────────────────
 function stepDur() { return 60 / bpm / 4; }
 
 function scheduleStep(step, t) {
@@ -1106,8 +1149,10 @@ function stopSeq() {
   renderAll();
 }
 
-let seqStartTime = 0;
-let visualRaf = null;
+// ── Visual sync ────────────────────────────────────────────────────
+// Runs on rAF to keep the playhead and band renders in sync with audio time.
+let seqStartTime    = 0;
+let visualRaf       = null;
 let lastRenderedStep = -1;
 
 function visualTick() {
@@ -1124,8 +1169,16 @@ function visualTick() {
   visualRaf = requestAnimationFrame(visualTick);
 }
 
-// ─── Canvas Rendering ─────────────────────────────────────────────
-const cvs = {};
+// ═══════════════════════════════════════════════════════════════════
+// MODULE: CANVAS RENDERER
+// Owns: DPR-aware canvas setup, per-band drawing (notes, grid,
+//       playhead, mute overlay), and the renderAll() broadcast.
+// Reads: notes, steps, muted, isPlaying, glowOn, instYParam, drawSt.
+// Future split: renderer.js
+// ═══════════════════════════════════════════════════════════════════
+
+// cvs: instId → <canvas> element  |  ctxs: instId → 2D context (scaled for DPR)
+const cvs  = {};
 const ctxs = {};
 
 function ensureCanvas(id) {
@@ -1308,7 +1361,15 @@ function renderAll() {
   INSTRUMENTS.forEach(i => renderBand(i.id));
 }
 
-// ─── Band Drawing Interaction ────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// MODULE: BAND INTERACTIONS
+// Owns: per-band pointer/touch event handling — draw, resize, move,
+//       velocity drag, double-tap delete.
+// Writes: notes[], drawSt[] (ephemeral drag state per instrument).
+// Future split: band-interactions.js
+// ═══════════════════════════════════════════════════════════════════
+
+// drawSt[instId]: ephemeral drag state, reset on each pointerdown
 const drawSt = {};
 
 function setupBandEvents(instId, canvas) {
@@ -1472,7 +1533,9 @@ function setupBandEvents(instId, canvas) {
     }
 
     if (ds.mode === 'vel') {
-      const deltaVel = (ds.velDragStartY - y) / canvas.offsetHeight * 1.5;
+      // 1:1 with pointer: 120px of drag = full range (0→1)
+      const PX_PER_UNIT = 120;
+      const deltaVel = (ds.velDragStartY - y) / PX_PER_UNIT;
       const newVel = Math.max(0.05, Math.min(1.0, ds.velDragStartVel + deltaVel));
       ds.hitNote.vel = newVel;
       ds.hitNote.yVal = newVel; // keep yVal in sync with vel drag
@@ -1611,10 +1674,21 @@ function setupBandEvents(instId, canvas) {
   canvas.addEventListener('touchend', onUp);
 }
 
-// ─── Build DOM ────────────────────────────────────────────────────
-const instVol = { kick:0.9, snare:0.9, hihat:0.9, tom:0.9 };
-const instYParam = { kick:null, snare:null, hihat:null, tom:null }; // null = volume
+// ═══════════════════════════════════════════════════════════════════
+// MODULE: UI — INSTRUMENT PANELS
+// Owns: band DOM construction (buildBands), instrument selection,
+//       volume fill, Y-param picker, synth panel rendering.
+// Future split: ui-bands.js + ui-synth-panel.js
+// ═══════════════════════════════════════════════════════════════════
 
+// ── Per-instrument UI state ────────────────────────────────────────
+const instVol        = { kick:0.9, snare:0.9, hihat:0.9, tom:0.9 };
+const instYParam     = { kick:null, snare:null, hihat:null, tom:null }; // null = vol drag
+const instYParamRange = { kick:{min:0,max:1}, snare:{min:0,max:1}, hihat:{min:0,max:1}, tom:{min:0,max:1} };
+// Saved per-note entanglement state for the 3-way cycle (off → all → saved → off)
+const instEntangleSaved = { kick:null, snare:null, hihat:null, tom:null };
+
+// ── Volume fill helper ─────────────────────────────────────────────
 function updateVolFill(instId) {
   const fill = document.getElementById('volfill-' + instId);
   if (fill) fill.style.height = (instVol[instId] * 100) + '%';
@@ -1680,10 +1754,7 @@ document.addEventListener('pointerdown', (e) => {
   if (!picker.contains(e.target)) picker.classList.remove('visible');
 }, true);
 
-const instYParamRange = { kick:{min:0,max:1}, snare:{min:0,max:1}, hihat:{min:0,max:1}, tom:{min:0,max:1} };
-// Saved per-note entanglement state for the 3-way cycle (off → all → saved → off)
-const instEntangleSaved = { kick:null, snare:null, hihat:null, tom:null };
-
+// ── Band DOM builder ───────────────────────────────────────────────
 function buildBands() {
   const container = document.getElementById('bands');
   container.innerHTML = '';
@@ -1775,8 +1846,9 @@ function buildBands() {
         clearTimeout(holdTimer); holdTimer = null;
       }
       if (isDragging) {
-        // More responsive: 2× sensitivity, full range in half the label height
-        const newVol = Math.max(0, Math.min(1, volStartVal - dy / (lbl.offsetHeight * 1.0)));
+        // 1:1 with pointer: 150px of drag = full range (0→1)
+        const PX_PER_UNIT = 150;
+        const newVol = Math.max(0, Math.min(1, volStartVal - dy / PX_PER_UNIT));
         instVol[inst.id] = newVol;
         updateVolFill(inst.id);
         // Mute indicator: if dragged to 0, mark as muted
@@ -1847,6 +1919,7 @@ function buildBands() {
   });
 }
 
+// ── Instrument selection ───────────────────────────────────────────
 function selectInst(id) {
   selectedInst = id;
   document.querySelectorAll('.band-label').forEach((el, i) => {
@@ -1858,7 +1931,9 @@ function selectInst(id) {
   renderSynthPanel();
 }
 
-// ─── Synth Panel ──────────────────────────────────────────────────
+// ── Synth panel ────────────────────────────────────────────────────
+// NOTE: PRESETS lives here (next to its consumer renderSynthPanel) but
+// logically belongs to SYNTH DATA. Move to synth-data.js on split.
 let autoTest = false;
 let autoTestTimer = null;
 
@@ -1992,7 +2067,16 @@ function fmtParam(min, max, val, fmt) {
   return Math.round(val);
 }
 
-// ─── Scene Presets ────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// MODULE: UI — PRESET STORAGE
+// Owns: built-in scene presets (SCENE_PRESETS), loadScene(), and
+//       user preset save/load via localStorage.
+// NOTE: SCENE_PRESETS data logically belongs to SYNTH DATA but lives
+//       here for proximity to loadScene(). Move on split.
+// Future split: presets.js
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Built-in scene presets ─────────────────────────────────────────
 const SCENE_PRESETS = [
   {
     name: '4 on the Floor',
@@ -2108,6 +2192,7 @@ const SCENE_PRESETS = [
   },
 ];
 
+// ── Scene loader ───────────────────────────────────────────────────
 function loadScene(scene) {
   // Set global transport
   bpm = scene.bpm;
@@ -2128,8 +2213,18 @@ function loadScene(scene) {
   // Leave scene-select showing the loaded preset name (don't reset to '')
 }
 
-// ─── Live Hold-to-Record ──────────────────────────────────────────
-const liveRec = {}; // per-instId state
+// ═══════════════════════════════════════════════════════════════════
+// MODULE: SAMPLE RECORDER
+// Owns: hold-to-record (startLiveRecord/stopLiveRecord), the sample
+//       modal tape recorder (startTape, startCropRecord, drawTapeLoop,
+//       stopTape, drawBufferWaveform), and all MediaRecorder plumbing.
+// Reads: bpm, steps, instSamples, instSampleBeats, notes (writes back).
+// Future split: sample-recorder.js
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Live hold-to-record state ──────────────────────────────────────
+// liveRec[instId] = { active, mr, stream } | null
+const liveRec = {};
 
 async function startLiveRecord(instId, btn) {
   if (liveRec[instId]?.active) return;
@@ -2202,27 +2297,27 @@ function stopLiveRecord(instId, btn) {
   if (state.mr.state !== 'inactive') state.mr.stop();
 }
 
-// ─── Sample Modal — Scrolling Tape Recorder ───────────────────────
-let sampleInstId = null;
-let sampleBeats  = 1;
-let mediaStream  = null;
+// ── Sample modal state ─────────────────────────────────────────────
+let sampleInstId  = null;
+let sampleBeats   = 1;
+let mediaStream   = null;
 let mediaRecorder = null;
-let recChunks    = [];
+let recChunks     = [];
 let pendingBuffer = null;
 let analyserNode  = null;
 
-// Tape state
-let tapeActive   = false;
-let tapeRecording = false;
-let tapeRAF      = null;
-let tapeSamples  = [];
-let tapePos      = 0;
-let tapeCanvasW  = 300;
-let tapeCanvasH  = 110;
-let tapeSecs     = 0;
-let tapeRecSecs  = 0;
-let tapePrerollFrac = 0.5;  // fraction of canvas width that is pre-roll
-let tapeStartTime = 0;
+// Tape animator state
+let tapeActive      = false;
+let tapeRecording   = false;
+let tapeRAF         = null;
+let tapeSamples     = [];
+let tapePos         = 0;
+let tapeCanvasW     = 300;
+let tapeCanvasH     = 110;
+let tapeSecs        = 0;
+let tapeRecSecs     = 0;
+let tapePrerollFrac = 0.5;
+let tapeStartTime   = 0;
 let tapeRecStartTime = 0;
 
 function getTapeCanvas() {
@@ -2618,10 +2713,10 @@ document.querySelectorAll('.sm-len').forEach(btn => {
   });
 });
 
-// ── Crop mode ──
-let recMode = 'tape';  // 'tape' | 'crop'
-let cropBeats = 1;     // selected crop window in steps
-let cropOffsetSec = 0; // draggable start offset within the recorded buffer
+// ── Crop mode state ────────────────────────────────────────────────
+let recMode        = 'tape';  // 'tape' | 'crop'
+let cropBeats      = 1;       // selected crop window in steps
+let cropOffsetSec  = 0;       // draggable start offset within the recorded buffer
 
 document.querySelectorAll('.rec-mode-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -2748,8 +2843,15 @@ function setupRecDoubleTap(instId) {
   // handled via long-hold: hold REC to clear sample
 }
 
-// ─── Controls ─────────────────────────────────────────────────────
-// ── Gear dropdown ──
+// ═══════════════════════════════════════════════════════════════════
+// MODULE: UI — CONTROLS & INIT
+// Owns: all top-bar event listeners (play, BPM, swing, steps, CLR,
+//       fullscreen, gear menu), scene-select wiring, inline prompt,
+//       user preset storage (captureScene, save/load), and app init.
+// Future split: ui-controls.js  +  init.js
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Gear dropdown ──────────────────────────────────────────────────
 const gearBtn  = document.getElementById('gear-btn');
 const gearMenu = document.getElementById('gear-menu');
 gearBtn.addEventListener('click', (e) => {
@@ -2770,6 +2872,7 @@ document.getElementById('glow-item').addEventListener('click', () => {
   document.getElementById('glow-toggle').classList.toggle('active', glowOn);
 });
 
+// ── Transport controls ─────────────────────────────────────────────
 document.getElementById('play-btn').addEventListener('click', function () {
   isPlaying = !isPlaying;
   this.textContent = isPlaying ? '■ STOP' : '▶ PLAY';
@@ -2777,6 +2880,7 @@ document.getElementById('play-btn').addEventListener('click', function () {
   if (isPlaying) startSeq(); else stopSeq();
 });
 
+// ── CLR hold-to-clear button ───────────────────────────────────────
 const clrBtn  = document.getElementById('clear-btn');
 const clrFill = document.getElementById('clr-fill');
 const CLR_HOLD_MS = 1000;
@@ -2816,6 +2920,7 @@ clrBtn.addEventListener('pointerup',     clrCancel);
 clrBtn.addEventListener('pointercancel', clrCancel);
 clrBtn.addEventListener('pointerleave',  clrCancel);
 
+// ── BPM / Swing / Steps ───────────────────────────────────────────
 document.getElementById('bpm-slider').addEventListener('input', function () {
   bpm = +this.value;
   document.getElementById('bpm-display').textContent = bpm;
@@ -2836,6 +2941,7 @@ document.querySelectorAll('.step-btn').forEach(btn => {
   });
 });
 
+// ── Fullscreen ────────────────────────────────────────────────────
 document.getElementById('fs-btn').addEventListener('click', () => {
   const el = document.documentElement;
   if (!document.fullscreenElement) {
@@ -2850,6 +2956,7 @@ document.addEventListener('fullscreenchange', () => {
   document.getElementById('fs-btn').textContent = document.fullscreenElement ? '✕' : '⛶';
 });
 
+// ── Synth panel toggle ────────────────────────────────────────────
 const synthToggleBar = document.getElementById('synth-toggle-bar');
 
 function toggleSynthPanel() {
@@ -2861,12 +2968,12 @@ function toggleSynthPanel() {
 
 synthToggleBar.addEventListener('click', toggleSynthPanel);
 
-// ─── Init ─────────────────────────────────────────────────────────
+// ── App init ──────────────────────────────────────────────────────
 buildBands();
 selectInst('kick');
 document.getElementById('glow-toggle').classList.add('active');
 
-// Populate scene select
+// ── Scene select wiring ───────────────────────────────────────────
 const sceneSelect = document.getElementById('scene-select');
 const builtinGrp = document.createElement('optgroup');
 builtinGrp.label = 'Built-in';
@@ -2888,7 +2995,7 @@ sceneSelect.addEventListener('change', function() {
   this.style.color = 'var(--accent)';
 });
 
-// ── Inline prompt (replaces window.prompt for Android) ──────────
+// ── Inline prompt (replaces window.prompt — blocked on some Android WebViews) ──
 function showPresetNamePrompt(onConfirm) {
   const overlay = document.getElementById('inline-prompt');
   const input   = document.getElementById('inline-prompt-input');
@@ -2914,7 +3021,7 @@ function showPresetNamePrompt(onConfirm) {
   input.addEventListener('keydown', onKey);
 }
 
-// ── User preset storage ──────────────────────────────────────────
+// ── User preset storage (localStorage) ───────────────────────────
 function captureScene(name) {
   return {
     name,
@@ -2981,7 +3088,7 @@ async function loadAllUserPresets() {
 }
 loadAllUserPresets();
 
-// Gear menu actions
+// ── Gear menu actions ─────────────────────────────────────────────
 document.getElementById('save-preset-item').addEventListener('click', () => {
   gearMenu.classList.remove('open');
   gearBtn.classList.remove('active');
@@ -2998,7 +3105,8 @@ document.getElementById('clear-samples-item').addEventListener('click', () => {
   gearBtn.classList.remove('active');
 });
 
-// Render after fonts + layout settle
+// ── Seed pattern + deferred first render ─────────────────────────
+// Waits for fonts and layout to settle before first paint.
 setTimeout(() => {
   renderAll();
   // Seed a simple 4-on-the-floor to demo
@@ -3025,6 +3133,8 @@ setTimeout(() => {
   renderAll();
 }, 200);
 
+// ── Resize handler ────────────────────────────────────────────────
+// Clears cached DPR-scaled contexts so they're rebuilt at the new size.
 window.addEventListener('resize', () => {
   Object.keys(ctxs).forEach(k => delete ctxs[k]);
   renderAll();
