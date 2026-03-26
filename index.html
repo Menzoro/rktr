@@ -658,6 +658,10 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
           <span>Glow</span>
           <div class="gear-toggle active" id="glow-toggle"></div>
         </div>
+        <div class="gear-item" id="autoplay-item">
+          <span>Autoplay</span>
+          <div class="gear-toggle active" id="autoplay-toggle"></div>
+        </div>
         <div class="gear-divider"></div>
         <div class="gear-item" id="save-preset-item">
           <span>Save preset…</span>
@@ -702,7 +706,7 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
         </div>
       </div>
       <!-- Scrolling waveform canvas — taller, full-width -->
-      <div id="sm-canvas-wrap" style="position:relative;width:100%;border-radius:6px;overflow:hidden;border:1px solid var(--border);background:#18182a;">
+      <div id="sm-canvas-wrap" style="position:relative;width:100%;border-radius:6px;overflow:hidden;border:1px solid var(--border);background:#18182a;touch-action:none;">
         <canvas id="sample-canvas" style="width:100%;height:110px;display:block;"></canvas>
         <div id="sm-rec-tint"></div>
         <div id="sm-center-line"></div>
@@ -777,11 +781,37 @@ function resumeAC() { if (AC.state === 'suspended') AC.resume(); }
 document.addEventListener('click', resumeAC);
 document.addEventListener('touchstart', resumeAC, { passive: true });
 
+// ── Monitor ducking (for live hold-to-record) ──────────────────────
+// Smoothly drops the master output to DUCK_GAIN while recording so the
+// backing beat is audible as a soft guide but doesn't bleed into the mic.
+const DUCK_GAIN   = 0.05;
+const DUCK_RAMP   = 0.03;   // seconds to ramp down — fast, exponential
+const UNDUCK_RAMP = 0.18;   // seconds to ramp back up
+let   duckCount   = 0;      // ref-count so overlapping recordings don't fight
+
+function duckMaster() {
+  duckCount++;
+  if (duckCount === 1) {
+    masterGain.gain.cancelScheduledValues(AC.currentTime);
+    masterGain.gain.setValueAtTime(masterGain.gain.value, AC.currentTime);
+    masterGain.gain.exponentialRampToValueAtTime(DUCK_GAIN, AC.currentTime + DUCK_RAMP);
+  }
+}
+function unduckMaster() {
+  duckCount = Math.max(0, duckCount - 1);
+  if (duckCount === 0) {
+    masterGain.gain.cancelScheduledValues(AC.currentTime);
+    masterGain.gain.setValueAtTime(masterGain.gain.value, AC.currentTime);
+    masterGain.gain.exponentialRampToValueAtTime(0.85, AC.currentTime + UNDUCK_RAMP);
+  }
+}
+
 // ── Transport ──────────────────────────────────────────────────────
 let bpm    = 120;
 let steps  = 16;
 let swing  = 0;
 let glowOn = true;
+let autoPlayOnPlace = true;  // play sound when a note is placed on the grid
 let isPlaying = false;
 let quantOn   = false;    // reserved for future quantise-to-grid feature
 
@@ -808,6 +838,10 @@ const muted  = { kick:false, snare:false, hihat:false, tom:false };
 
 // ── UI selection state ─────────────────────────────────────────────
 let selectedInst = 'kick';
+
+// ── Live-record visual state ───────────────────────────────────────
+// liveRecSt[instId] = { active, startStep } — read by renderBand to draw the rec marker
+const liveRecSt = {};
 
 // ═══════════════════════════════════════════════════════════════════
 // MODULE: SYNTH DATA
@@ -1334,6 +1368,31 @@ function renderBand(instId) {
     cx.fillText('MUTED', w / 2, h / 2);
   }
 
+  // Live-record start marker — shown while hold-to-record is active
+  const lst = liveRecSt[instId];
+  if (lst?.active) {
+    const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 200); // 0.1–1.0, ~3 Hz
+    const mx = lst.startStep * stepW;
+    // Full-height red tint over the start step
+    cx.fillStyle = 'rgba(224,48,48,0.18)';
+    cx.fillRect(mx, 0, stepW, h);
+    // Pulsing red line on left edge
+    cx.strokeStyle = '#e03030';
+    cx.lineWidth = 2.5;
+    cx.globalAlpha = pulse;
+    cx.shadowColor = '#e03030';
+    cx.shadowBlur = 8 * pulse;
+    cx.beginPath(); cx.moveTo(mx + 1, 0); cx.lineTo(mx + 1, h); cx.stroke();
+    cx.shadowBlur = 0;
+    // Small "REC" label
+    cx.fillStyle = '#e03030';
+    cx.font = 'bold 8px JetBrains Mono, monospace';
+    cx.textAlign = 'left';
+    cx.textBaseline = 'top';
+    cx.fillText('REC', mx + 4, 3);
+    cx.globalAlpha = 1;
+  }
+
   // Playhead — on top of everything
   if (isPlaying && lastRenderedStep >= 0) {
     const px = lastRenderedStep * stepW;
@@ -1589,12 +1648,16 @@ function setupBandEvents(instId, canvas) {
 
     if (ds.mode === 'vel' || ds.mode === 'move' || ds.mode === 'pending-hit') {
       if (ds.mode === 'pending-hit' && ds.hitNote) {
-        // Single tap on note body = toggle entanglement if Y-param is set, else preview
+        // Single tap on note body — toggle entanglement if Y-param set
         if (instYParam[instId] !== null) {
           ds.hitNote.entangled = !ds.hitNote.entangled;
-        } else {
-          triggerInst(instId, AC.currentTime + 0.01, ds.hitNote.vel, ds.hitNote.dur);
         }
+        // No triggerInst here: avoids double-play on double-tap delete
+      }
+      // Velocity drag finished — play once at the new velocity so the user can hear it
+      if (ds.mode === 'vel' && ds.hitNote && autoPlayOnPlace) {
+        resumeAC();
+        triggerInst(instId, AC.currentTime + 0.01, ds.hitNote.vel, ds.hitNote.dur);
       }
       renderBand(instId); return;
     }
@@ -1621,17 +1684,17 @@ function setupBandEvents(instId, canvas) {
     if (isTap) {
       const hit = noteHitTest(ds.startX);
       if (hit) {
-        triggerInst(instId, AC.currentTime + 0.01, hit.note.vel, hit.note.dur);
+        // Tapping an existing note — no sound (avoids double-play on double-tap delete)
       } else {
         const step = xToStep(ds.startX);
         const dur = instSamples[instId] ? instSampleBeats[instId] : 1;
         const vel = yToVel(ds.startY);
-        const yVal = vel; // yVal = same as vel initially
+        const yVal = vel;
         const safe = Math.max(0, Math.min(steps - dur, step));
         notes[instId] = [...(notes[instId] || []).filter(n =>
           n.step + n.dur <= safe || n.step >= safe + dur
         ), { step: safe, vel, dur, yVal }];
-        triggerInst(instId, AC.currentTime + 0.01, vel, dur);
+        if (autoPlayOnPlace) triggerInst(instId, AC.currentTime + 0.01, vel, dur);
       }
     }
     renderBand(instId);
@@ -1821,6 +1884,7 @@ function buildBands() {
     let volStartVal = 0.9;
     let didHold = false;
     let isDragging = false;
+    let isDown = false;       // true from pointerdown until pointerup/cancel
     let mutedBySwipe = false;
     let premuteVol = 0.9;
 
@@ -1830,6 +1894,7 @@ function buildBands() {
       volStartVal = instVol[inst.id];
       didHold = false;
       isDragging = false;
+      isDown = true;
       holdTimer = setTimeout(() => {
         didHold = true;
         holdTimer = null;
@@ -1838,8 +1903,10 @@ function buildBands() {
       lbl.setPointerCapture(e.pointerId);
     });
 
+    let volDragLastTrigger = 0;
+
     lbl.addEventListener('pointermove', (e) => {
-      if (e.target === recBtn || (!isDragging && holdTimer === null && !didHold)) return;
+      if (e.target === recBtn || !isDown) return;
       const dy = e.clientY - pointerStartY;
       if (!isDragging && Math.abs(dy) > 6) {
         isDragging = true;
@@ -1857,51 +1924,65 @@ function buildBands() {
       }
     });
 
+    // Double-tap tracking for mute
+    let lastLblTap = 0;
+
     lbl.addEventListener('pointerup', (e) => {
       if (e.target === recBtn) return;
       if (holdTimer !== null) {
         clearTimeout(holdTimer); holdTimer = null;
         if (!isDragging) {
-          // Clean tap — toggle mute, restore vol if un-muting
-          if (muted[inst.id]) {
-            muted[inst.id] = false;
-            instVol[inst.id] = premuteVol || 0.9;
-            lbl.classList.remove('muted-swipe');
-            updateVolFill(inst.id);
-          } else {
-            premuteVol = instVol[inst.id];
-            muted[inst.id] = true;
-            instVol[inst.id] = 0;
-            lbl.classList.add('muted-swipe');
-            updateVolFill(inst.id);
-          }
-          if (instYParam[inst.id] !== null) {
-            const ns = notes[inst.id] || [];
-            const allOn  = ns.length > 0 && ns.every(n => n.entangled);
-            const allOff = ns.every(n => !n.entangled);
-            const hasSaved = instEntangleSaved[inst.id] !== null;
-            if (allOff) {
-              instEntangleSaved[inst.id] = ns.map(n => n.entangled);
-              ns.forEach(n => { n.entangled = true; });
-            } else if (allOn && hasSaved) {
-              const saved = instEntangleSaved[inst.id];
-              ns.forEach((n, i) => { n.entangled = saved[i] ?? false; });
+          const now = Date.now();
+          const isDoubleTap = (now - lastLblTap) < 320;
+          lastLblTap = isDoubleTap ? 0 : now; // reset so triple-tap doesn't re-trigger
+
+          if (isDoubleTap) {
+            // Double tap — toggle mute
+            if (muted[inst.id]) {
+              muted[inst.id] = false;
+              instVol[inst.id] = premuteVol || 0.9;
+              lbl.classList.remove('muted-swipe');
+              updateVolFill(inst.id);
             } else {
-              instEntangleSaved[inst.id] = ns.map(n => n.entangled);
-              ns.forEach(n => { n.entangled = false; });
+              premuteVol = instVol[inst.id];
+              muted[inst.id] = true;
+              instVol[inst.id] = 0;
+              lbl.classList.add('muted-swipe');
+              updateVolFill(inst.id);
             }
             renderBand(inst.id);
           } else {
-            selectInst(inst.id);
+            // Single tap — select instrument / cycle entanglement
+            if (instYParam[inst.id] !== null) {
+              const ns = notes[inst.id] || [];
+              const allOn  = ns.length > 0 && ns.every(n => n.entangled);
+              const allOff = ns.every(n => !n.entangled);
+              const hasSaved = instEntangleSaved[inst.id] !== null;
+              if (allOff) {
+                instEntangleSaved[inst.id] = ns.map(n => n.entangled);
+                ns.forEach(n => { n.entangled = true; });
+              } else if (allOn && hasSaved) {
+                const saved = instEntangleSaved[inst.id];
+                ns.forEach((n, i) => { n.entangled = saved[i] ?? false; });
+              } else {
+                instEntangleSaved[inst.id] = ns.map(n => n.entangled);
+                ns.forEach(n => { n.entangled = false; });
+              }
+              renderBand(inst.id);
+            } else {
+              selectInst(inst.id);
+            }
           }
         }
       }
+      const wasDragging = isDragging;
       isDragging = false;
       didHold = false;
+      isDown = false;
     });
 
     lbl.addEventListener('pointercancel', () => {
-      clearTimeout(holdTimer); holdTimer = null; didHold = false; isDragging = false;
+      clearTimeout(holdTimer); holdTimer = null; didHold = false; isDragging = false; isDown = false;
     });
 
     const wrap = document.createElement('div');
@@ -2236,10 +2317,15 @@ async function startLiveRecord(instId, btn) {
     return;
   }
 
-  // Capture which step we're starting on (snapped to next step boundary)
-  const delayMs = isPlaying ? Math.max(0, (nextStepTime - AC.currentTime) * 1000) : 0;
-  // The step that will be playing when recording actually starts
+  // Snap to next step boundary when sequencer is running
+  const delayMs  = isPlaying ? Math.max(0, (nextStepTime - AC.currentTime) * 1000) : 0;
   const startStep = isPlaying ? (currentPos % steps) : 0;
+
+  // ── Visual: mark start position on the band ────────────────────
+  liveRecSt[instId] = { active: true, startStep };
+
+  // ── Audio: duck the backing beat ───────────────────────────────
+  duckMaster();
 
   const chunks = [];
   const mr = new MediaRecorder(stream, (() => {
@@ -2251,6 +2337,13 @@ async function startLiveRecord(instId, btn) {
   mr.onstop = async () => {
     stream.getTracks().forEach(t => t.stop());
     btn.classList.remove('live-recording');
+
+    // Clear visual marker and restore gain
+    cancelAnimationFrame(liveRec[instId]?.pulseRaf);
+    liveRecSt[instId] = { active: false, startStep: 0 };
+    unduckMaster();
+    renderBand(instId);
+
     try {
       const mimeType = mr.mimeType || '';
       const blob = new Blob(chunks, mimeType ? { type: mimeType } : {});
@@ -2271,7 +2364,6 @@ async function startLiveRecord(instId, btn) {
       // Auto-place note at the step where recording started
       if (isPlaying || startStep > 0) {
         const ns = notes[instId] || [];
-        // Remove any existing note at that step
         notes[instId] = ns.filter(n => n.step !== startStep);
         notes[instId].push({ step: startStep, vel: 0.9, dur: durSteps });
         renderAll();
@@ -2282,7 +2374,16 @@ async function startLiveRecord(instId, btn) {
     liveRec[instId] = null;
   };
 
-  liveRec[instId] = { active: true, mr, stream };
+  liveRec[instId] = { active: true, mr, stream, pulseRaf: null };
+
+  // Pulse the marker via rAF so it visually breathes while holding
+  function pulseTick() {
+    if (!liveRecSt[instId]?.active) return;
+    renderBand(instId);
+    liveRec[instId].pulseRaf = requestAnimationFrame(pulseTick);
+  }
+  liveRec[instId].pulseRaf = requestAnimationFrame(pulseTick);
+
   btn.classList.add('live-recording');
 
   setTimeout(() => {
@@ -2294,7 +2395,9 @@ function stopLiveRecord(instId, btn) {
   const state = liveRec[instId];
   if (!state?.active) return;
   state.active = false;
+  cancelAnimationFrame(state.pulseRaf);
   if (state.mr.state !== 'inactive') state.mr.stop();
+  // Note: liveRecSt cleared and unduck called inside mr.onstop
 }
 
 // ── Sample modal state ─────────────────────────────────────────────
@@ -2359,11 +2462,7 @@ function openSampleModal(instId) {
   document.querySelectorAll('.sm-len').forEach(b => b.classList.toggle('active', +b.dataset.beats === sampleBeats));
   document.getElementById('sample-modal').classList.add('visible');
   setTimeout(() => {
-    const cv = getTapeCanvas();
-    const cx = cv.getContext('2d');
-    cx.fillStyle = '#18182a';
-    cx.fillRect(0, 0, cv.width, cv.height);
-    updatePlayhead(0);
+    drawTapePreview();
   }, 40);
 }
 
@@ -2690,6 +2789,53 @@ function drawBufferWaveform(audioBuf) {
   document.getElementById('sm-playhead').style.display = 'none';
 }
 
+// Draws a static preview of the tape layout (pre-roll vs rec zone) before recording starts.
+// Called when the modal opens in tape mode, and when the user picks a different length.
+function drawTapePreview() {
+  if (recMode !== 'tape' || tapeActive) return;
+  const cv = getTapeCanvas();
+  const cx = cv.getContext('2d');
+  const w = cv.width, h = cv.height;
+
+  const stepSec      = 60 / bpm / 4;
+  const prerollSecs  = 2 * (60 / bpm);
+  const recSecs      = sampleBeats * stepSec;
+  const totalSecs    = prerollSecs + recSecs;
+  const midX         = Math.round(w * (prerollSecs / totalSecs));
+
+  // Background
+  cx.fillStyle = '#18182a';
+  cx.fillRect(0, 0, w, h);
+
+  // Pre-roll zone — subtle grey tint
+  cx.fillStyle = 'rgba(85,85,106,0.10)';
+  cx.fillRect(0, 0, midX, h);
+
+  // Rec zone — accent tint
+  cx.fillStyle = 'rgba(0,229,200,0.07)';
+  cx.fillRect(midX, 0, w - midX, h);
+
+  // Divider line
+  cx.strokeStyle = 'rgba(0,229,200,0.35)';
+  cx.lineWidth = 2;
+  cx.beginPath(); cx.moveTo(midX, 0); cx.lineTo(midX, h); cx.stroke();
+
+  // Duration label in rec zone
+  cx.fillStyle = 'rgba(0,229,200,0.5)';
+  cx.font = 'bold 9px JetBrains Mono, monospace';
+  cx.textAlign = 'left';
+  cx.textBaseline = 'top';
+  const label = recSecs >= 1 ? recSecs.toFixed(1) + 's' : Math.round(recSecs * 1000) + 'ms';
+  cx.fillText(label, midX + 6, 5);
+
+  // Update overlays to match preview proportions
+  document.getElementById('sm-center-line').style.left  = midX + 'px';
+  document.getElementById('sm-rec-tint').style.left     = midX + 'px';
+  document.getElementById('sm-rec-tint').style.width    = (w - midX) + 'px';
+  document.getElementById('sm-rec-tint').style.opacity  = '';
+  document.getElementById('sm-playhead').style.display  = 'none';
+}
+
 document.getElementById('sample-rec-btn').addEventListener('click', () => {
   if (tapeActive) {
     stopTape();
@@ -2710,6 +2856,7 @@ document.querySelectorAll('.sm-len').forEach(btn => {
     if (!btn.dataset.beats) return;
     sampleBeats = +btn.dataset.beats;
     document.querySelectorAll('[data-beats]').forEach(b => b.classList.toggle('active', +b.dataset.beats === sampleBeats));
+    drawTapePreview();
   });
 });
 
@@ -2736,6 +2883,8 @@ document.querySelectorAll('.rec-mode-btn').forEach(btn => {
     if (recMode === 'crop') {
       sampleBeats = 8; // 8 steps = 2 beats, the full crop window
       updateCropRegion();
+    } else {
+      drawTapePreview();
     }
   });
 });
@@ -2750,18 +2899,54 @@ document.querySelectorAll('[data-cropbeats]').forEach(btn => {
 });
 
 function updateCropRegion() {
-  if (recMode !== 'crop' || !pendingBuffer) return;
   const cv = getTapeCanvas();
   const w = cv.width;
-  const totalSec = pendingBuffer.duration;
+  const region = document.getElementById('sm-crop-region');
+
+  if (recMode !== 'crop') { region.style.display = 'none'; return; }
+
+  if (!pendingBuffer) {
+    // Pre-recording: show placeholder — draw a dim canvas and a proportional ghost region
+    const cx = cv.getContext('2d');
+    const h = cv.height;
+    cx.fillStyle = '#18182a';
+    cx.fillRect(0, 0, w, h);
+
+    // Ghost: show crop window as a fraction of the full 2-beat recording length
+    const fullSec    = 8 * (60 / bpm / 4);   // sampleBeats fixed at 8 in crop mode
+    const windowSec  = cropBeats * (60 / bpm / 4);
+    const widthFrac  = Math.min(1, windowSec / fullSec);
+
+    // Draw ghost waveform area
+    cx.fillStyle = 'rgba(85,85,106,0.08)';
+    cx.fillRect(0, 0, w, h);
+
+    // Crop window ghost
+    cx.fillStyle = 'rgba(0,229,200,0.07)';
+    cx.fillRect(0, 0, Math.round(w * widthFrac), h);
+
+    // Duration label
+    cx.fillStyle = 'rgba(0,229,200,0.4)';
+    cx.font = 'bold 9px JetBrains Mono, monospace';
+    cx.textAlign = 'left';
+    cx.textBaseline = 'top';
+    const label = windowSec >= 1 ? windowSec.toFixed(2) + 's' : Math.round(windowSec * 1000) + 'ms';
+    cx.fillText(label, 6, 5);
+
+    region.style.display = '';
+    region.style.left  = '0%';
+    region.style.width = (widthFrac * 100) + '%';
+    return;
+  }
+
+  // Post-recording: position against actual buffer duration
+  const totalSec  = pendingBuffer.duration;
   const windowSec = cropBeats * (60 / bpm / 4);
-  // Clamp offset
   cropOffsetSec = Math.max(0, Math.min(totalSec - windowSec, cropOffsetSec));
   const startFrac = cropOffsetSec / totalSec;
   const widthFrac = Math.min(1, windowSec / totalSec);
-  const region = document.getElementById('sm-crop-region');
   region.style.display = '';
-  region.style.left = (startFrac * 100) + '%';
+  region.style.left  = (startFrac * 100) + '%';
   region.style.width = (widthFrac * 100) + '%';
 }
 
@@ -2870,6 +3055,12 @@ document.addEventListener('pointerdown', (e) => {
 document.getElementById('glow-item').addEventListener('click', () => {
   glowOn = !glowOn;
   document.getElementById('glow-toggle').classList.toggle('active', glowOn);
+});
+
+// Autoplay-on-placement toggle
+document.getElementById('autoplay-item').addEventListener('click', () => {
+  autoPlayOnPlace = !autoPlayOnPlace;
+  document.getElementById('autoplay-toggle').classList.toggle('active', autoPlayOnPlace);
 });
 
 // ── Transport controls ─────────────────────────────────────────────
