@@ -462,6 +462,135 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   margin-bottom:2px;
 }
 
+/* ── MASTER FX PEDALS ── */
+.fx-pedal{
+  background:var(--s2);
+  border:1px solid var(--border);
+  border-radius:8px;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  /* All pedals same height — driven by grid row alignment */
+}
+.fx-pedal-title{
+  background:var(--pedal);
+  color:#000;
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  padding:5px 10px;
+  flex-shrink:0;
+}
+.fx-pedal-body{
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  flex:1;
+  min-height:0;
+}
+.fx-pedal-top{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:6px;
+  padding:8px 10px;
+}
+.fx-pedal-divider{
+  height:1px;
+  background:var(--border);
+  flex-shrink:0;
+}
+.fx-pedal-bottom{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:6px;
+  padding:8px 10px;
+}
+.fx-param-row{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+}
+.fx-param-row label{
+  font-size:8px;
+  color:var(--muted);
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  white-space:nowrap;
+  width:48px;
+  flex-shrink:0;
+}
+.fx-slider{
+  flex:1;
+  min-width:0;
+  max-width:100%;
+  accent-color:var(--pedal,var(--accent));
+  cursor:pointer;
+}
+.fx-val{
+  font-size:9px;
+  font-weight:700;
+  color:var(--text);
+  min-width:30px;
+  text-align:right;
+}
+.fx-time-btn{
+  background:var(--s3);
+  border:1px solid var(--border);
+  color:var(--muted);
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px;
+  padding:3px 6px;
+  cursor:pointer;
+  border-radius:3px;
+  transition:all 0.12s;
+  touch-action:manipulation;
+}
+.fx-time-btn.active{
+  background:var(--pedal,var(--accent));
+  color:#000;
+  border-color:var(--pedal,var(--accent));
+}
+
+/* Vertical EQ sliders */
+.eq-band{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:3px;
+  flex:1;
+}
+.eq-vslider{
+  writing-mode:vertical-lr;
+  direction:rtl;
+  -webkit-appearance:slider-vertical;
+  appearance:slider-vertical;
+  width:28px;
+  height:60px;
+  accent-color:var(--pedal,var(--accent));
+  cursor:pointer;
+  flex-shrink:0;
+}
+.eq-label{
+  font-size:8px;
+  font-weight:700;
+  color:var(--text);
+  min-width:28px;
+  text-align:center;
+}
+.eq-band-label{
+  font-size:7px;
+  color:var(--muted);
+  letter-spacing:0.1em;
+  text-transform:uppercase;
+  text-align:center;
+}
+
 /* Scrollbar hide */
 ::-webkit-scrollbar{display:none;}
 
@@ -663,6 +792,11 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
           <div class="gear-toggle active" id="autoplay-toggle"></div>
         </div>
         <div class="gear-divider"></div>
+        <div class="gear-item" id="master-fx-item">
+          <span>Master FX…</span>
+          <span style="font-size:10px;color:var(--muted);">⚡</span>
+        </div>
+        <div class="gear-divider"></div>
         <div class="gear-item" id="save-preset-item">
           <span>Save preset…</span>
           <span style="font-size:10px;color:var(--muted);">＋</span>
@@ -762,6 +896,135 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
     </div>
   </div>
 
+  <!-- MASTER FX MODAL -->
+  <div id="master-fx-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;">
+    <div id="master-fx-box" style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:18px;width:min(420px,96vw);display:flex;flex-direction:column;gap:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--text);">Master FX</span>
+        <button id="master-fx-close" class="sm-btn" style="flex:0;padding:4px 12px;">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;align-items:stretch;gap:10px;">
+
+        <!-- DELAY pedal — hihat yellow -->
+        <div class="fx-pedal" style="--pedal:#ffe040;">
+          <div class="fx-pedal-title">Delay</div>
+          <div class="fx-pedal-body">
+            <div class="fx-pedal-top">
+              <div class="fx-param-row">
+                <label>Time</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;flex:1;">
+                  <button class="fx-time-btn" data-time="1/16">1/16</button>
+                  <button class="fx-time-btn" data-time="1/8">1/8</button>
+                  <button class="fx-time-btn" data-time="1/4">1/4</button>
+                  <button class="fx-time-btn" data-time="d1/8">d1/8</button>
+                  <button class="fx-time-btn" data-time="3/8">3/8</button>
+                  <button class="fx-time-btn" data-time="1/2">1/2</button>
+                </div>
+              </div>
+            </div>
+            <div class="fx-pedal-divider"></div>
+            <div class="fx-pedal-bottom">
+              <div class="fx-param-row">
+                <label>Feedback</label>
+                <input type="range" class="fx-slider" min="0" max="0.85" step="0.01" data-mfx="delayFeedback" style="flex:1;min-width:0;">
+                <span class="fx-val" id="mfxv-delayFeedback"></span>
+              </div>
+              <div class="fx-param-row">
+                <label>Mix</label>
+                <input type="range" class="fx-slider" min="0" max="1" step="0.01" data-mfx="delayMix" style="flex:1;min-width:0;">
+                <span class="fx-val" id="mfxv-delayMix"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- REVERB pedal — tom green -->
+        <div class="fx-pedal" style="--pedal:#2dffa0;">
+          <div class="fx-pedal-title">Reverb</div>
+          <div class="fx-pedal-body">
+            <div class="fx-pedal-top">
+              <div class="fx-param-row">
+                <label>Type</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;flex:1;">
+                  <button class="fx-time-btn" data-mfxir="room">Room</button>
+                  <button class="fx-time-btn" data-mfxir="hall">Hall</button>
+                </div>
+              </div>
+            </div>
+            <div class="fx-pedal-divider"></div>
+            <div class="fx-pedal-bottom">
+              <div class="fx-param-row">
+                <label>Wet</label>
+                <input type="range" class="fx-slider" min="0" max="0.6" step="0.01" data-mfx="reverbWet" style="flex:1;min-width:0;">
+                <span class="fx-val" id="mfxv-reverbWet"></span>
+              </div>
+              <div class="fx-param-row">
+                <label>Decay</label>
+                <input type="range" class="fx-slider" min="0" max="1" step="0.01" data-mfx="reverbDecay" style="flex:1;min-width:0;">
+                <span class="fx-val" id="mfxv-reverbDecay"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- EQ pedal — snare purple -->
+        <div class="fx-pedal" style="--pedal:#8b78ff;">
+          <div class="fx-pedal-title">EQ</div>
+          <div class="fx-pedal-body" style="justify-content:center;">
+            <div style="display:flex;gap:8px;justify-content:space-around;align-items:center;padding:8px 10px;">
+              <div class="eq-band">
+                <input type="range" class="eq-vslider" min="-12" max="12" step="0.5" value="0" data-mfx="eqLow">
+                <span class="fx-val eq-label" id="mfxv-eqLow">0dB</span>
+                <label class="eq-band-label">Low</label>
+              </div>
+              <div class="eq-band">
+                <input type="range" class="eq-vslider" min="-10" max="10" step="0.5" value="0" data-mfx="eqMid">
+                <span class="fx-val eq-label" id="mfxv-eqMid">0dB</span>
+                <label class="eq-band-label">Mid</label>
+              </div>
+              <div class="eq-band">
+                <input type="range" class="eq-vslider" min="-12" max="12" step="0.5" value="0" data-mfx="eqHigh">
+                <span class="fx-val eq-label" id="mfxv-eqHigh">0dB</span>
+                <label class="eq-band-label">High</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- COMP pedal — kick orange -->
+        <div class="fx-pedal" style="--pedal:#ff5e2a;">
+          <div class="fx-pedal-title">Compression</div>
+          <div class="fx-pedal-body">
+            <div class="fx-pedal-top">
+              <div class="fx-param-row">
+                <label>Amount</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;flex:1;">
+                  <button class="fx-time-btn" data-mfxcomp="off">Off</button>
+                  <button class="fx-time-btn" data-mfxcomp="glue">Glue</button>
+                  <button class="fx-time-btn" data-mfxcomp="limit">Limit</button>
+                </div>
+              </div>
+            </div>
+            <div class="fx-pedal-divider"></div>
+            <div class="fx-pedal-bottom">
+              <div class="fx-param-row">
+                <label>Threshold</label>
+                <input type="range" class="fx-slider" min="-40" max="0" step="0.5" data-mfx="compThresh" style="flex:1;min-width:0;">
+                <span class="fx-val" id="mfxv-compThresh"></span>
+              </div>
+              <div class="fx-param-row">
+                <label>Volume</label>
+                <input type="range" class="fx-slider" min="0" max="1.5" step="0.01" data-mfx="volume" style="flex:1;min-width:0;">
+                <span class="fx-val" id="mfxv-volume"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -804,6 +1067,158 @@ function unduckMaster() {
     masterGain.gain.setValueAtTime(masterGain.gain.value, AC.currentTime);
     masterGain.gain.exponentialRampToValueAtTime(0.85, AC.currentTime + UNDUCK_RAMP);
   }
+}
+
+// ── Master FX chain ────────────────────────────────────────────────
+// Signal flow: masterGain → masterComp → masterDelayDry
+//                                      → masterReverb → AC.destination
+// Shared delay: instruments send into it per-note via delaySend gain nodes.
+// masterGain no longer connects directly to destination — chain does.
+
+const masterFXP = {
+  delayTime:     '1/4',
+  delayFeedback: 0.35,
+  delayMix:      0.4,
+  reverbWet:     0,      // off by default — no FX on load
+  reverbType:    'room',
+  reverbDecay:   0.5,
+  comp:          'off',
+  compThresh:    -12,
+  eqLow:         0,
+  eqMid:         0,
+  eqHigh:        0,
+  volume:        0.85,
+};
+
+// Master-bus compression presets — gentler than per-track settings
+const MASTER_COMP_PRESETS = {
+  off:   { threshold:  0, ratio:  1,   knee:  0, attack: 0.010, release: 0.20 },
+  glue:  { threshold:-12, ratio:  2,   knee: 10, attack: 0.010, release: 0.20 }, // transparent glue
+  limit: { threshold: -6, ratio: 10,   knee:  2, attack: 0.001, release: 0.10 }, // soft limiter
+};
+
+// Delay time options — steps of 1/16 note each
+// 2 rows × 3 cols: 1/16, 1/8, 1/4 / dotted-1/8, 3/8, 1/2
+const DELAY_TIMES = { '1/16':1, '1/8':2, '1/4':4, 'd1/8':3, '3/8':6, '1/2':8 };
+
+// Nodes — built at init, referenced globally
+let masterComp, masterDelayNode, masterDelayFeedback, masterDelayWet,
+    masterDelayDry, masterReverbConv, masterReverbWet, masterReverbDry,
+    masterEqLow, masterEqMid, masterEqHigh, masterOut;
+
+function buildMasterChain() {
+  // Master compressor — first in chain after masterGain
+  masterComp = AC.createDynamicsCompressor();
+  const cp = MASTER_COMP_PRESETS[masterFXP.comp] || MASTER_COMP_PRESETS.off;
+  masterComp.threshold.value = cp.threshold;
+  masterComp.ratio.value     = cp.ratio;
+  masterComp.knee.value      = cp.knee;
+  masterComp.attack.value    = cp.attack;
+  masterComp.release.value   = cp.release;
+
+  // Master 3-band EQ
+  masterEqLow  = AC.createBiquadFilter();
+  masterEqLow.type = 'lowshelf'; masterEqLow.frequency.value = 200;
+  masterEqLow.gain.value = masterFXP.eqLow;
+
+  masterEqMid  = AC.createBiquadFilter();
+  masterEqMid.type = 'peaking'; masterEqMid.frequency.value = 1000; masterEqMid.Q.value = 1;
+  masterEqMid.gain.value = masterFXP.eqMid;
+
+  masterEqHigh = AC.createBiquadFilter();
+  masterEqHigh.type = 'highshelf'; masterEqHigh.frequency.value = 6000;
+  masterEqHigh.gain.value = masterFXP.eqHigh;
+
+  // Shared delay (max 4s buffer)
+  masterDelayNode     = AC.createDelay(4.0);
+  masterDelayFeedback = AC.createGain();
+  masterDelayWet      = AC.createGain();
+  masterDelayDry      = AC.createGain();
+  // Delay time set lazily — stepDur() is valid here since bpm is already set
+  masterDelayNode.delayTime.value = (DELAY_TIMES[masterFXP.delayTime] || 4) * stepDur();
+  masterDelayFeedback.gain.value  = masterFXP.delayFeedback;
+  masterDelayWet.gain.value       = masterFXP.delayMix;
+  masterDelayDry.gain.value       = 1;
+
+  // Master reverb — use IR if available, otherwise convolver stays silent (safe)
+  masterReverbConv = AC.createConvolver();
+  const ir = getIR(masterFXP.reverbType);
+  if (ir) masterReverbConv.buffer = ir;
+  masterReverbWet  = AC.createGain();
+  masterReverbDry  = AC.createGain();
+  masterReverbWet.gain.value = masterFXP.reverbWet;
+  masterReverbDry.gain.value = 1;
+
+  // Final output — volume controlled here
+  masterOut = AC.createGain();
+  masterOut.gain.value = masterFXP.volume;
+  masterOut.connect(AC.destination);
+
+  // ── Routing ──────────────────────────────────────────────────────
+  // masterGain → masterComp → masterDelayDry → masterReverbDry → masterOut
+  //                                                             → masterReverbConv → masterReverbWet → masterOut
+  // masterDelayNode (fed by per-note sends) → feedback loop
+  //                                         → masterDelayWet → masterReverbDry
+
+  masterGain.connect(masterComp);
+  masterComp.connect(masterEqLow);
+  masterEqLow.connect(masterEqMid);
+  masterEqMid.connect(masterEqHigh);
+  masterEqHigh.connect(masterDelayDry);
+  masterDelayDry.connect(masterReverbDry);
+  masterReverbDry.connect(masterOut);
+  masterReverbDry.connect(masterReverbConv);
+  masterReverbConv.connect(masterReverbWet);
+  masterReverbWet.connect(masterOut);
+
+  // Delay: per-note sends → delayNode → feedback → delayNode (loop)
+  //                                   → delayWet → reverbDry (joins main path)
+  masterDelayNode.connect(masterDelayFeedback);
+  masterDelayFeedback.connect(masterDelayNode);
+  masterDelayNode.connect(masterDelayWet);
+  masterDelayWet.connect(masterReverbDry);
+
+  // NOTE: disconnect masterGain from AC.destination now that masterOut handles output.
+  // This is necessary for the volume slider to reach true zero.
+  try { masterGain.disconnect(AC.destination); } catch(e) {}
+}
+
+// Per-note delay send — called by triggerInst/playSample for armed notes
+// Returns a GainNode connected to masterDelayNode that auto-disconnects after playDur
+function makeDelaySend(sendLevel, t, playDur) {
+  const send = AC.createGain();
+  send.gain.value = sendLevel;
+  send.connect(masterDelayNode);
+  // Auto-disconnect after note ends to avoid node accumulation
+  setTimeout(() => { try { send.disconnect(); } catch(e) {} },
+    (t - AC.currentTime + playDur + 0.5) * 1000);
+  return send;
+}
+
+function applyMasterFX() {
+  if (!masterComp) return;
+  const cp = MASTER_COMP_PRESETS[masterFXP.comp] || MASTER_COMP_PRESETS.off;
+  // Threshold = preset base + user slider offset; off preset ignores slider
+  const thresh = masterFXP.comp === 'off' ? 0 : masterFXP.compThresh;
+  masterComp.threshold.value = thresh;
+  masterComp.ratio.value     = cp.ratio;
+  masterComp.knee.value      = cp.knee;
+  masterComp.attack.value    = cp.attack;
+  masterComp.release.value   = cp.release;
+  masterEqLow.gain.setTargetAtTime(masterFXP.eqLow,  AC.currentTime, 0.01);
+  masterEqMid.gain.setTargetAtTime(masterFXP.eqMid,  AC.currentTime, 0.01);
+  masterEqHigh.gain.setTargetAtTime(masterFXP.eqHigh, AC.currentTime, 0.01);
+  // Volume: allow true zero (mute)
+  masterOut.gain.setTargetAtTime(Math.max(0, masterFXP.volume), AC.currentTime, 0.01);
+  const steps16 = DELAY_TIMES[masterFXP.delayTime] || 4;
+  masterDelayNode.delayTime.setTargetAtTime(steps16 * stepDur(), AC.currentTime, 0.01);
+  masterDelayFeedback.gain.setTargetAtTime(masterFXP.delayFeedback, AC.currentTime, 0.01);
+  masterDelayWet.gain.setTargetAtTime(masterFXP.delayMix, AC.currentTime, 0.01);
+  masterReverbWet.gain.setTargetAtTime(masterFXP.reverbWet, AC.currentTime, 0.01);
+  // Rebuild IR with new decay and re-assign — cheap enough to do on slider change
+  const decay = 1.0 + masterFXP.reverbDecay * 3.0; // maps 0–1 → decay 1.0–4.0
+  const newIR = makeImpulse(masterFXP.reverbType, decay);
+  masterReverbConv.buffer = newIR;
 }
 
 // ── Transport ──────────────────────────────────────────────────────
@@ -1080,7 +1495,159 @@ function velCurve(v) { return Math.pow(v, 2.2); }
 const instSamples     = { kick:null, snare:null, hihat:null, tom:null };
 const instSampleBeats = { kick:2, snare:2, hihat:2, tom:2 };
 
-function playSample(id, t, vel, dur) {
+// ── Per-instrument FX chains ───────────────────────────────────────
+// instFX[id] = { drive(WaveShaper), low(Biquad), mid(Biquad), high(Biquad),
+//                dryGain, wetGain, convolver, input(Gain) }
+// The chain: input → drive → low → mid → high → dryGain → masterGain
+//                                              → wetGain → convolver → masterGain
+const instFX = {};
+
+// Default FX params per instrument
+const instFXP = {
+  kick:  { drive:0, bass:0, low:0, mid:0, high:0, wet:0, reverb:'room', comp:'none' },
+  snare: { drive:0, bass:0, low:0, mid:0, high:0, wet:0, reverb:'room', comp:'none' },
+  hihat: { drive:0, bass:0, low:0, mid:0, high:0, wet:0, reverb:'room', comp:'none' },
+  tom:   { drive:0, bass:0, low:0, mid:0, high:0, wet:0, reverb:'room', comp:'none' },
+};
+
+// Compression presets — threshold / ratio / knee / attack / release
+const COMP_PRESETS = {
+  none:   { threshold:  0,  ratio: 1,   knee: 0,  attack: 0.003, release: 0.15 },
+  normal: { threshold:-18,  ratio: 4,   knee: 6,  attack: 0.005, release: 0.12 },
+  heavy:  { threshold:-30,  ratio: 12,  knee: 3,  attack: 0.001, release: 0.08 },
+};
+
+// ── Impulse response generator ─────────────────────────────────────
+// Builds an algorithmic IR from decaying noise — no external files needed.
+// type: 'room' (~0.8s, early reflections) | 'hall' (~2.5s, lush tail)
+function makeImpulse(type, decayOverride) {
+  const roomDur = 0.8, hallDur = 2.5;
+  const dur     = type === 'hall' ? hallDur : roomDur;
+  const decay   = decayOverride !== undefined ? decayOverride
+                  : (type === 'hall' ? 2.8 : 1.8);
+  const sr      = AC.sampleRate;
+  const len     = Math.ceil(sr * dur);
+  const buf     = AC.createBuffer(2, len, sr);
+
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) {
+      // White noise shaped by exponential decay envelope
+      const env = Math.pow(1 - i / len, decay);
+      d[i] = (Math.random() * 2 - 1) * env;
+      // For hall: add a small pre-delay gap (~20ms) and early reflection bump
+      if (type === 'hall' && i < sr * 0.02) d[i] *= (i / (sr * 0.02));
+    }
+  }
+  return buf;
+}
+
+let irRoom = null;
+let irHall = null;
+
+function getIR(type) { return type === 'hall' ? irHall : irRoom; }
+
+// Build the FX chain for an instrument (called when a sample is loaded)
+function buildFXChain(id) {
+  teardownFXChain(id); // clear any existing chain
+
+  const p = instFXP[id];
+
+  // Input gain node — everything routes through here
+  const input = AC.createGain();
+  input.gain.value = 1;
+
+  // Drive (waveshaper) — bypassed when drive=0
+  const driveNode = AC.createWaveShaper();
+  driveNode.curve = p.drive > 0.01 ? mkDist(p.drive).curve : null;
+  driveNode.oversample = '2x';
+
+  // 4-band EQ: bass shelf (80Hz) + low shelf (200Hz) + mid peak + high shelf
+  const bass = AC.createBiquadFilter();
+  bass.type = 'lowshelf'; bass.frequency.value = 80;
+  bass.gain.value = p.bass;
+
+  const low = AC.createBiquadFilter();
+  low.type = 'lowshelf'; low.frequency.value = 200;
+  low.gain.value = p.low;
+
+  const mid = AC.createBiquadFilter();
+  mid.type = 'peaking'; mid.frequency.value = 1000; mid.Q.value = 1;
+  mid.gain.value = p.mid;
+
+  const high = AC.createBiquadFilter();
+  high.type = 'highshelf'; high.frequency.value = 6000;
+  high.gain.value = p.high;
+
+  // Compressor — placed after EQ, before dry/wet split
+  const comp = AC.createDynamicsCompressor();
+  const cp = COMP_PRESETS[p.comp] || COMP_PRESETS.none;
+  comp.threshold.value = cp.threshold;
+  comp.ratio.value     = cp.ratio;
+  comp.knee.value      = cp.knee;
+  comp.attack.value    = cp.attack;
+  comp.release.value   = cp.release;
+
+  // Dry / wet routing
+  const dryGain = AC.createGain();
+  dryGain.gain.value = 1 - p.wet;
+
+  const wetGain = AC.createGain();
+  wetGain.gain.value = p.wet;
+
+  const convolver = AC.createConvolver();
+  convolver.buffer = getIR(p.reverb) || irRoom;
+
+  // Wire it up: input → bass → low → mid → high → drive → comp → dry/wet split → reverb
+  input.connect(bass);
+  bass.connect(low);
+  low.connect(mid);
+  mid.connect(high);
+  high.connect(driveNode);
+  driveNode.connect(comp);
+  comp.connect(dryGain);
+  comp.connect(wetGain);
+  dryGain.connect(masterGain);
+  wetGain.connect(convolver);
+  convolver.connect(masterGain);
+
+  instFX[id] = { input, driveNode, bass, low, mid, high, comp, dryGain, wetGain, convolver };
+}
+
+function teardownFXChain(id) {
+  const fx = instFX[id];
+  if (!fx) return;
+  try {
+    fx.input.disconnect(); fx.driveNode.disconnect();
+    fx.bass.disconnect(); fx.low.disconnect(); fx.mid.disconnect(); fx.high.disconnect();
+    fx.comp.disconnect();
+    fx.dryGain.disconnect(); fx.wetGain.disconnect(); fx.convolver.disconnect();
+  } catch(e) {}
+  delete instFX[id];
+}
+
+// Apply current instFXP values to a live FX chain
+function applyFX(id) {
+  const fx = instFX[id];
+  if (!fx) return;
+  const p = instFXP[id];
+  fx.driveNode.curve       = p.drive > 0.01 ? mkDist(p.drive).curve : null;
+  fx.bass.gain.value       = p.bass;
+  fx.low.gain.value        = p.low;
+  fx.mid.gain.value        = p.mid;
+  fx.high.gain.value       = p.high;
+  const cp = COMP_PRESETS[p.comp] || COMP_PRESETS.none;
+  fx.comp.threshold.value  = cp.threshold;
+  fx.comp.ratio.value      = cp.ratio;
+  fx.comp.knee.value       = cp.knee;
+  fx.comp.attack.value     = cp.attack;
+  fx.comp.release.value    = cp.release;
+  fx.dryGain.gain.value    = 1 - p.wet;
+  fx.wetGain.gain.value    = p.wet;
+  fx.convolver.buffer      = getIR(p.reverb) || irRoom;
+}
+
+function playSample(id, t, vel, dur, overrides = {}) {
   const buf = instSamples[id];
   if (!buf) return;
   const v = velCurve(vel) * (instVol[id] ?? 1);
@@ -1089,22 +1656,29 @@ function playSample(id, t, vel, dur) {
   src.buffer = buf;
 
   if (noteSecs >= buf.duration) {
-    // Stretch: slow down playback to fill the note duration
     src.playbackRate.value = buf.duration / noteSecs;
   } else {
-    // Chop: play at normal speed, cut off at note end
     src.playbackRate.value = 1;
   }
 
   const playDur = Math.min(noteSecs, buf.duration / src.playbackRate.value);
   const g = AC.createGain();
   g.gain.setValueAtTime(v, t);
-  // Small fade at end to avoid click on chop
   if (noteSecs < buf.duration) {
     g.gain.setValueAtTime(v, t + playDur - 0.01);
     g.gain.linearRampToValueAtTime(0, t + playDur);
   }
-  src.connect(g); g.connect(masterGain);
+
+  // Route through FX chain if one exists, otherwise straight to master
+  const dest = instFX[id] ? instFX[id].input : masterGain;
+  src.connect(g); g.connect(dest);
+
+  // Per-note delay send — only if note is armed with delay (delaySend > 0)
+  if (overrides.delaySend > 0 && masterDelayNode) {
+    const send = makeDelaySend(overrides.delaySend, t, playDur);
+    g.connect(send);
+  }
+
   src.start(t); src.stop(t + playDur + 0.01);
 }
 
@@ -1112,12 +1686,33 @@ function playSample(id, t, vel, dur) {
 // Single entry point: routes to sample or synth voice, applies mute + vol.
 function triggerInst(id, t, vel, dur, overrides = {}) {
   if (muted[id]) return;
-  if (instSamples[id]) { playSample(id, t, vel, dur); return; }
+  if (instSamples[id]) { playSample(id, t, vel, dur, overrides); return; }
   const v = velCurve(vel) * (instVol[id] ?? 1);
   if (id === 'kick')  playKick(t, v, overrides);
   else if (id === 'snare') playSnare(t, v, overrides);
   else if (id === 'hihat') playHihat(t, v, dur > 1, overrides);
   else if (id === 'tom')   playTom(t, v, overrides);
+
+  // Delay send for synth voices — re-trigger the same voice into the delay bus
+  if (overrides.delaySend > 0 && masterDelayNode) {
+    const sendVol = overrides.delaySend * v;
+    const playDur = dur * stepDur();
+    const send = AC.createGain();
+    send.gain.value = sendVol;
+    send.connect(masterDelayNode);
+    // Play the same voice into the send gain (without recursing into delay)
+    const dryOverrides = { ...overrides, delaySend: 0 };
+    // Temporarily reroute: we need the voice's output to also hit send.
+    // Simplest: just connect masterGain → send for a very short window.
+    // Use a timed gain that opens on the beat and closes quickly.
+    const tap = AC.createGain();
+    tap.gain.setValueAtTime(sendVol, t);
+    tap.gain.setValueAtTime(0, t + Math.min(playDur, 0.3));
+    masterGain.connect(tap);
+    tap.connect(masterDelayNode);
+    setTimeout(() => { try { masterGain.disconnect(tap); tap.disconnect(); send.disconnect(); } catch(e) {} },
+      (t - AC.currentTime + playDur + 0.5) * 1000);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1139,12 +1734,16 @@ function scheduleStep(step, t) {
     for (const n of ns) {
       if (n.step === step) {
         const swingOff = (step % 2 === 1) ? swing * stepDur() : 0;
-        // Build param override from entanglement
         const override = {};
         const yp = instYParam[inst.id];
         if (n.entangled && yp && yp !== 'none' && yp !== null) {
-          const range = instYParamRange[inst.id] || { min:0, max:1 };
-          override[yp] = range.min + (n.yVal ?? n.vel) * (range.max - range.min);
+          if (yp === 'delaySend') {
+            // Route into shared delay at Y-value amount — unarmed notes get 0 (bypass)
+            override.delaySend = n.yVal ?? n.vel;
+          } else {
+            const range = instYParamRange[inst.id] || { min:0, max:1 };
+            override[yp] = range.min + (n.yVal ?? n.vel) * (range.max - range.min);
+          }
         }
         triggerInst(inst.id, t + swingOff, n.vel, n.dur, override);
       }
@@ -1765,6 +2364,7 @@ function showYParamPicker(instId, anchorEl) {
 
   picker.innerHTML = `<div class="yparam-label" style="color:${inst.color}">Y → ${inst.name}</div>` +
     `<div class="yparam-opt${current === 'none' ? ' active' : ''}" data-key="none">— None —</div>` +
+    `<div class="yparam-opt${current === 'delaySend' ? ' active' : ''}" data-key="delaySend" data-min="0" data-max="1" style="color:#ffe040">⟳ Delay send</div>` +
     defs.map(d => `<div class="yparam-opt${current === d.k ? ' active' : ''}" data-key="${d.k}" data-min="${d.min}" data-max="${d.max}">${d.l}</div>`).join('');
 
   // Position: to the right of anchor, clamped to screen
@@ -2073,6 +2673,14 @@ function applyPreset(instId, preset) {
 function renderSynthPanel() {
   const inner = document.getElementById('synth-inner');
   const inst = INSTRUMENTS.find(i => i.id === selectedInst);
+
+  // ── Context switch: FX rack when sample is loaded ─────────────
+  if (instSamples[selectedInst]) {
+    renderFXPanel(inner, inst);
+    return;
+  }
+
+  // ── Synth params (no sample loaded) ───────────────────────────
   const defs = SYNTH_DEFS[selectedInst] || [];
   const params = SP[selectedInst] || {};
   const presets = PRESETS[selectedInst] || [];
@@ -2137,6 +2745,109 @@ function renderSynthPanel() {
   document.getElementById('preview-btn').addEventListener('click', () => {
     resumeAC();
     triggerInst(selectedInst, AC.currentTime + 0.01, 0.82, 1);
+  });
+}
+
+function renderFXPanel(inner, inst) {
+  const id = inst.id;
+  const p  = instFXP[id];
+
+  const fmtDb  = v => (v >= 0 ? '+' : '') + v.toFixed(1) + 'dB';
+  const fmtPct = v => Math.round(v * 100) + '%';
+
+  inner.innerHTML = `
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+      <button id="synth-close-btn" title="Close">▼</button>
+      <span style="font-size:10px;font-weight:700;letter-spacing:0.12em;color:${inst.color}">${inst.name}</span>
+      <span style="font-size:9px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;">sample fx</span>
+      <div style="flex:1;"></div>
+      <button class="prev-btn" id="fx-preview-btn">▶ TEST</button>
+    </div>
+    <div class="synth-row">
+      <div class="param">
+        <div class="param-header"><label>Bass</label><span class="pval" id="fxv-bass">${fmtDb(p.bass)}</span></div>
+        <input type="range" min="-12" max="12" step="0.5" value="${p.bass}" data-fx="bass">
+      </div>
+      <div class="param">
+        <div class="param-header"><label>Low</label><span class="pval" id="fxv-low">${fmtDb(p.low)}</span></div>
+        <input type="range" min="-12" max="12" step="0.5" value="${p.low}" data-fx="low">
+      </div>
+      <div class="param">
+        <div class="param-header"><label>Mid</label><span class="pval" id="fxv-mid">${fmtDb(p.mid)}</span></div>
+        <input type="range" min="-10" max="10" step="0.5" value="${p.mid}" data-fx="mid">
+      </div>
+      <div class="param">
+        <div class="param-header"><label>High</label><span class="pval" id="fxv-high">${fmtDb(p.high)}</span></div>
+        <input type="range" min="-12" max="12" step="0.5" value="${p.high}" data-fx="high">
+      </div>
+      <div class="param">
+        <div class="param-header"><label>Drive</label><span class="pval" id="fxv-drive">${p.drive.toFixed(2)}</span></div>
+        <input type="range" min="0" max="1.5" step="0.01" value="${p.drive}" data-fx="drive">
+      </div>
+      <div class="param" style="flex:0 0 auto;min-width:80px;">
+        <div class="param-header"><label>Compression</label></div>
+        <div style="display:flex;border:1px solid var(--border);border-radius:3px;overflow:hidden;margin-top:4px;">
+          <button class="rec-mode-btn${p.comp==='none'  ?' active':''}" data-comp="none"   style="flex:1;font-size:8px;">No</button>
+          <button class="rec-mode-btn${p.comp==='normal'?' active':''}" data-comp="normal" style="flex:1;font-size:8px;">Normal</button>
+          <button class="rec-mode-btn${p.comp==='heavy' ?' active':''}" data-comp="heavy"  style="flex:1;font-size:8px;">Heavy</button>
+        </div>
+      </div>
+      <div class="param">
+        <div class="param-header"><label>Reverb</label><span class="pval" id="fxv-wet">${fmtPct(p.wet)}</span></div>
+        <input type="range" min="0" max="1" step="0.01" value="${p.wet}" data-fx="wet">
+      </div>
+      <div class="param" style="flex:0 0 auto;min-width:60px;">
+        <div class="param-header"><label>Reverb type</label></div>
+        <div style="display:flex;border:1px solid var(--border);border-radius:3px;overflow:hidden;margin-top:4px;">
+          <button class="rec-mode-btn${p.reverb==='room'?' active':''}" data-irtype="room" style="flex:1;font-size:8px;">Room</button>
+          <button class="rec-mode-btn${p.reverb==='hall'?' active':''}" data-irtype="hall" style="flex:1;font-size:8px;">Hall</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('synth-close-btn').addEventListener('click', toggleSynthPanel);
+  document.getElementById('fx-preview-btn').addEventListener('click', () => {
+    resumeAC();
+    triggerInst(id, AC.currentTime + 0.01, 0.82, 1);
+  });
+
+  // Sliders
+  inner.querySelectorAll('input[data-fx]').forEach(inp => {
+    inp.addEventListener('input', function () {
+      const key = this.dataset.fx;
+      const val = +this.value;
+      instFXP[id][key] = val;
+      applyFX(id);
+      const lbl = document.getElementById('fxv-' + key);
+      if (!lbl) return;
+      if      (key === 'drive') lbl.textContent = val.toFixed(2);
+      else if (key === 'wet')   lbl.textContent = fmtPct(val);
+      else                      lbl.textContent = fmtDb(val);
+    });
+    inp.addEventListener('change', () => {
+      if (autoTest) { resumeAC(); triggerInst(id, AC.currentTime + 0.01, 0.82, 1); }
+    });
+  });
+
+  // Room / Hall toggle
+  inner.querySelectorAll('[data-irtype]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      instFXP[id].reverb = btn.dataset.irtype;
+      applyFX(id);
+      inner.querySelectorAll('[data-irtype]').forEach(b =>
+        b.classList.toggle('active', b === btn));
+    });
+  });
+
+  // Comp preset toggle
+  inner.querySelectorAll('[data-comp]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      instFXP[id].comp = btn.dataset.comp;
+      applyFX(id);
+      inner.querySelectorAll('[data-comp]').forEach(b =>
+        b.classList.toggle('active', b === btn));
+    });
   });
 }
 
@@ -2359,7 +3070,9 @@ async function startLiveRecord(instId, btn) {
       const durSteps = Math.max(1, Math.round(decoded.duration / stepDur()));
       instSamples[instId] = decoded;
       instSampleBeats[instId] = durSteps;
+      buildFXChain(instId);
       btn.classList.add('sampled');
+      if (instId === selectedInst) renderSynthPanel();
 
       // Auto-place note at the step where recording started
       if (isPlaying || startStep > 0) {
@@ -3017,6 +3730,8 @@ document.getElementById('sm-confirm').addEventListener('click', () => {
 
   instSamples[sampleInstId] = finalBuffer;
   instSampleBeats[sampleInstId] = finalBeats;
+  buildFXChain(sampleInstId);
+  if (sampleInstId === selectedInst) renderSynthPanel();
   const recBtn = document.getElementById('rec-' + sampleInstId);
   if (recBtn) recBtn.classList.add('sampled');
   closeSampleModal();
@@ -3289,16 +4004,108 @@ document.getElementById('save-preset-item').addEventListener('click', () => {
 document.getElementById('clear-samples-item').addEventListener('click', () => {
   INSTRUMENTS.forEach(inst => {
     instSamples[inst.id] = null;
+    teardownFXChain(inst.id);
     const btn = document.getElementById('rec-' + inst.id);
     if (btn) btn.classList.remove('sampled');
   });
   gearMenu.classList.remove('open');
   gearBtn.classList.remove('active');
+  renderSynthPanel();
+});
+
+// ── Master FX modal ───────────────────────────────────────────────
+function openMasterFX() {
+  const modal = document.getElementById('master-fx-modal');
+  modal.style.display = 'flex';
+
+  const fmtDb  = v => (v >= 0 ? '+' : '') + (+v).toFixed(1) + 'dB';
+  const fmtPct = v => Math.round(v * 100) + '%';
+
+  function fmtMFX(key, val) {
+    if (key === 'eqLow' || key === 'eqMid' || key === 'eqHigh') return (val >= 0 ? '+' : '') + (+val).toFixed(1) + 'dB';
+    if (key === 'compThresh') return (+val).toFixed(0) + 'dB';
+    if (key === 'reverbDecay') return Math.round(val * 100) + '%';
+    if (key === 'volume') return Math.round(val * 100) + '%';
+    return Math.round(val * 100) + '%';
+  }
+
+  // Populate all sliders and their labels
+  modal.querySelectorAll('[data-mfx]').forEach(inp => {
+    const key = inp.dataset.mfx;
+    inp.value = masterFXP[key];
+    const lbl = document.getElementById('mfxv-' + key);
+    if (lbl) lbl.textContent = fmtMFX(key, masterFXP[key]);
+  });
+
+  // Active states for toggles
+  modal.querySelectorAll('.fx-time-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.time === masterFXP.delayTime));
+  modal.querySelectorAll('[data-mfxir]').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.mfxir === masterFXP.reverbType));
+  modal.querySelectorAll('[data-mfxcomp]').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.mfxcomp === masterFXP.comp));
+
+  // Slider input handler — works for both horizontal and vertical sliders
+  modal.querySelectorAll('[data-mfx]').forEach(inp => {
+    inp.oninput = function() {
+      const key = this.dataset.mfx;
+      masterFXP[key] = +this.value;
+      applyMasterFX();
+      const lbl = document.getElementById('mfxv-' + key);
+      if (lbl) lbl.textContent = fmtMFX(key, +this.value);
+    };
+  });
+
+  // Delay time buttons
+  modal.querySelectorAll('.fx-time-btn').forEach(btn => {
+    btn.onclick = () => {
+      masterFXP.delayTime = btn.dataset.time;
+      applyMasterFX();
+      modal.querySelectorAll('.fx-time-btn').forEach(b =>
+        b.classList.toggle('active', b === btn));
+    };
+  });
+
+  // Reverb type
+  modal.querySelectorAll('[data-mfxir]').forEach(btn => {
+    btn.onclick = () => {
+      masterFXP.reverbType = btn.dataset.mfxir;
+      applyMasterFX();
+      modal.querySelectorAll('[data-mfxir]').forEach(b =>
+        b.classList.toggle('active', b === btn));
+    };
+  });
+
+  // Comp preset
+  modal.querySelectorAll('[data-mfxcomp]').forEach(btn => {
+    btn.onclick = () => {
+      masterFXP.comp = btn.dataset.mfxcomp;
+      applyMasterFX();
+      modal.querySelectorAll('[data-mfxcomp]').forEach(b =>
+        b.classList.toggle('active', b === btn));
+    };
+  });
+}
+
+document.getElementById('master-fx-item').addEventListener('click', () => {
+  gearMenu.classList.remove('open');
+  gearBtn.classList.remove('active');
+  openMasterFX();
+});
+
+document.getElementById('master-fx-close').addEventListener('click', () => {
+  document.getElementById('master-fx-modal').style.display = 'none';
 });
 
 // ── Seed pattern + deferred first render ─────────────────────────
 // Waits for fonts and layout to settle before first paint.
 setTimeout(() => {
+  // Build IRs first (they're cheap — just noise arrays)
+  irRoom = makeImpulse('room');
+  irHall = makeImpulse('hall');
+  // Now build master chain — IRs are ready so convolver gets a real buffer
+  buildMasterChain();
+  masterReverbConv.buffer = getIR(masterFXP.reverbType);
   renderAll();
   // Seed a simple 4-on-the-floor to demo
   notes.kick = [
