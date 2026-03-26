@@ -7,8 +7,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="RKTR">
-<title>RKTR</title>
+<meta name="apple-mobile-web-app-title" content="BYRG">
+<title>BYRG</title>
 <link rel="manifest" href="manifest.json">
 <script>
 if ('serviceWorker' in navigator) {
@@ -31,11 +31,11 @@ button, .tbn, .step-btn, .sm-len, .sm-btn, .rec-mode-btn, .inst-mute, .inst-rec 
   --text:#d8d8f0;
   --muted:#55556a;
   --accent:#00e5c8;
-  --kick:#ff5e2a;
-  --snare:#8b78ff;
+  --kick:#2dffa0;
+  --snare:#ff5e2a;
   --hat:#ffe040;
   --hihat:#ffe040;
-  --tom:#2dffa0;
+  --tom:#8b78ff;
 }
 html{
   height:100%;
@@ -78,13 +78,13 @@ body{
   min-height:0;
 }
 .logo{
-  font-size:14px;
+  font-size:20px;
   font-weight:700;
-  letter-spacing:0.18em;
+  letter-spacing:0.12em;
   color:var(--accent);
   white-space:nowrap;
+  line-height:1;
 }
-.logo span{color:var(--muted);font-weight:400;font-size:9px;letter-spacing:0.05em;margin-left:5px;}
 .topbar-group{display:flex;align-items:center;gap:5px;}
 .topbar-label{font-size:9px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;}
 .spacer{flex:1;}
@@ -755,7 +755,7 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   <!-- TOP BAR -->
   <div id="topbar">
     <button class="tbn" id="fs-btn" title="Fullscreen">⛶</button>
-    <span class="logo">RKTR</span>
+    <span class="logo"><span style="color:#8b78ff">B</span><span style="color:#ffe040">Y</span><span style="color:#ff5e2a">R</span><span style="color:#2dffa0">G</span></span>
     <div class="topbar-group">
       <span class="topbar-label">BPM</span>
       <input type="range" id="bpm-slider" min="60" max="200" value="120" step="1" class="top-slider">
@@ -771,12 +771,7 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
         <option value="">scene</option>
       </select>
     </div>
-    <div class="topbar-group">
-      <span class="topbar-label">STEPS</span>
-      <button class="step-btn" data-steps="8">8</button>
-      <button class="step-btn active" data-steps="16">16</button>
-      <button class="step-btn" data-steps="32">32</button>
-    </div>
+    <button class="tbn" id="master-fx-btn">FX</button>
     <div class="spacer"></div>
     <button class="tbn warn" id="clear-btn">CLR<div id="clr-fill"></div></button>
     <button class="tbn active" id="play-btn">▶ PLAY</button>
@@ -792,9 +787,13 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
           <div class="gear-toggle active" id="autoplay-toggle"></div>
         </div>
         <div class="gear-divider"></div>
-        <div class="gear-item" id="master-fx-item">
-          <span>Master FX…</span>
-          <span style="font-size:10px;color:var(--muted);">⚡</span>
+        <div class="gear-item" style="cursor:default;">
+          <span>Steps</span>
+          <div style="display:flex;gap:3px;">
+            <button class="step-btn" data-steps="8">8</button>
+            <button class="step-btn active" data-steps="16">16</button>
+            <button class="step-btn" data-steps="32">32</button>
+          </div>
         </div>
         <div class="gear-divider"></div>
         <div class="gear-item" id="save-preset-item">
@@ -905,8 +904,9 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;align-items:stretch;gap:10px;">
 
-        <!-- DELAY pedal — hihat yellow -->
-        <div class="fx-pedal" style="--pedal:#ffe040;">
+        <!-- B — EQ pedal — snare blue -->
+        <!-- Y — DELAY pedal — hihat yellow -->
+        <div class="fx-pedal" style="--pedal:#8b78ff;">
           <div class="fx-pedal-title">Delay</div>
           <div class="fx-pedal-body">
             <div class="fx-pedal-top">
@@ -938,8 +938,8 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
           </div>
         </div>
 
-        <!-- REVERB pedal — tom green -->
-        <div class="fx-pedal" style="--pedal:#2dffa0;">
+        <!-- G — REVERB pedal — tom green -->
+        <div class="fx-pedal" style="--pedal:#ffe040;">
           <div class="fx-pedal-title">Reverb</div>
           <div class="fx-pedal-body">
             <div class="fx-pedal-top">
@@ -967,8 +967,8 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
           </div>
         </div>
 
-        <!-- EQ pedal — snare purple -->
-        <div class="fx-pedal" style="--pedal:#8b78ff;">
+        <!-- B — EQ pedal — snare blue -->
+        <div class="fx-pedal" style="--pedal:#ff5e2a;">
           <div class="fx-pedal-title">EQ</div>
           <div class="fx-pedal-body" style="justify-content:center;">
             <div style="display:flex;gap:8px;justify-content:space-around;align-items:center;padding:8px 10px;">
@@ -991,8 +991,8 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
           </div>
         </div>
 
-        <!-- COMP pedal — kick orange -->
-        <div class="fx-pedal" style="--pedal:#ff5e2a;">
+        <!-- R — COMP pedal — kick red -->
+        <div class="fx-pedal" style="--pedal:#2dffa0;">
           <div class="fx-pedal-title">Compression</div>
           <div class="fx-pedal-body">
             <div class="fx-pedal-top">
@@ -1155,31 +1155,27 @@ function buildMasterChain() {
   masterOut.connect(AC.destination);
 
   // ── Routing ──────────────────────────────────────────────────────
-  // masterGain → masterComp → masterDelayDry → masterReverbDry → masterOut
-  //                                                             → masterReverbConv → masterReverbWet → masterOut
-  // masterDelayNode (fed by per-note sends) → feedback loop
-  //                                         → masterDelayWet → masterReverbDry
+  // Creative chain: Delay → Reverb → EQ → Comp → Out
+  // masterGain → masterDelayDry → masterReverbDry → EQ → Comp → masterOut
+  // Per-note sends → masterDelayNode → feedback → masterDelayWet → masterReverbDry
 
-  masterGain.connect(masterComp);
-  masterComp.connect(masterEqLow);
-  masterEqLow.connect(masterEqMid);
-  masterEqMid.connect(masterEqHigh);
-  masterEqHigh.connect(masterDelayDry);
+  masterGain.connect(masterDelayDry);
   masterDelayDry.connect(masterReverbDry);
-  masterReverbDry.connect(masterOut);
   masterReverbDry.connect(masterReverbConv);
   masterReverbConv.connect(masterReverbWet);
-  masterReverbWet.connect(masterOut);
+  masterReverbWet.connect(masterEqLow);
+  masterReverbDry.connect(masterEqLow);
+  masterEqLow.connect(masterEqMid);
+  masterEqMid.connect(masterEqHigh);
+  masterEqHigh.connect(masterComp);
+  masterComp.connect(masterOut);
 
-  // Delay: per-note sends → delayNode → feedback → delayNode (loop)
-  //                                   → delayWet → reverbDry (joins main path)
+  // Delay feedback loop
   masterDelayNode.connect(masterDelayFeedback);
   masterDelayFeedback.connect(masterDelayNode);
   masterDelayNode.connect(masterDelayWet);
   masterDelayWet.connect(masterReverbDry);
 
-  // NOTE: disconnect masterGain from AC.destination now that masterOut handles output.
-  // This is necessary for the volume slider to reach true zero.
   try { masterGain.disconnect(AC.destination); } catch(e) {}
 }
 
@@ -1240,10 +1236,10 @@ const SCHED_INTERVAL = 20;     // ms between scheduler ticks
 // ── Instrument definitions ─────────────────────────────────────────
 // Order = top-to-bottom render order in the band grid
 const INSTRUMENTS = [
-  { id: 'hihat', name: 'HIHAT', color: '#ffe040' },
-  { id: 'tom',   name: 'TOM',   color: '#2dffa0' },
-  { id: 'snare', name: 'SNARE', color: '#8b78ff' },
-  { id: 'kick',  name: 'KICK',  color: '#ff5e2a' },
+  { id: 'tom',   name: 'TOM',   color: '#8b78ff' },  // B — Blue
+  { id: 'hihat', name: 'HIHAT', color: '#ffe040' },  // Y — Yellow
+  { id: 'snare', name: 'SNARE', color: '#ff5e2a' },  // R — Red
+  { id: 'kick',  name: 'KICK',  color: '#2dffa0' },  // G — Green
 ];
 
 // ── Note data ──────────────────────────────────────────────────────
@@ -1494,6 +1490,22 @@ function velCurve(v) { return Math.pow(v, 2.2); }
 // instSamples: decoded AudioBuffers recorded by the user (null = use synth)
 const instSamples     = { kick:null, snare:null, hihat:null, tom:null };
 const instSampleBeats = { kick:2, snare:2, hihat:2, tom:2 };
+const instSamplesRev  = { kick:null, snare:null, hihat:null, tom:null }; // reversed copies
+
+// Build a reversed copy of a buffer (cached per instrument)
+function getReversedBuffer(id) {
+  if (instSamplesRev[id]) return instSamplesRev[id];
+  const src = instSamples[id];
+  if (!src) return null;
+  const rev = AC.createBuffer(src.numberOfChannels, src.length, src.sampleRate);
+  for (let ch = 0; ch < src.numberOfChannels; ch++) {
+    const srcData = src.getChannelData(ch);
+    const revData = rev.getChannelData(ch);
+    for (let i = 0; i < src.length; i++) revData[i] = srcData[src.length - 1 - i];
+  }
+  instSamplesRev[id] = rev;
+  return rev;
+}
 
 // ── Per-instrument FX chains ───────────────────────────────────────
 // instFX[id] = { drive(WaveShaper), low(Biquad), mid(Biquad), high(Biquad),
@@ -1648,10 +1660,11 @@ function applyFX(id) {
 }
 
 function playSample(id, t, vel, dur, overrides = {}) {
-  const buf = instSamples[id];
+  const isReversed = overrides.reversed;
+  const buf = isReversed ? (getReversedBuffer(id) || instSamples[id]) : instSamples[id];
   if (!buf) return;
   const v = velCurve(vel) * (instVol[id] ?? 1);
-  const noteSecs = dur * stepDur();
+  const noteSecs = Math.abs(dur) * stepDur();
   const src = AC.createBufferSource();
   src.buffer = buf;
 
@@ -1669,11 +1682,9 @@ function playSample(id, t, vel, dur, overrides = {}) {
     g.gain.linearRampToValueAtTime(0, t + playDur);
   }
 
-  // Route through FX chain if one exists, otherwise straight to master
   const dest = instFX[id] ? instFX[id].input : masterGain;
   src.connect(g); g.connect(dest);
 
-  // Per-note delay send — only if note is armed with delay (delaySend > 0)
   if (overrides.delaySend > 0 && masterDelayNode) {
     const send = makeDelaySend(overrides.delaySend, t, playDur);
     g.connect(send);
@@ -1686,8 +1697,7 @@ function playSample(id, t, vel, dur, overrides = {}) {
 // Single entry point: routes to sample or synth voice, applies mute + vol.
 function triggerInst(id, t, vel, dur, overrides = {}) {
   if (muted[id]) return;
-  if (instSamples[id]) { playSample(id, t, vel, dur, overrides); return; }
-  const v = velCurve(vel) * (instVol[id] ?? 1);
+  if (instSamples[id]) { playSample(id, t, vel, dur, overrides); return; }  const v = velCurve(vel) * (instVol[id] ?? 1);
   if (id === 'kick')  playKick(t, v, overrides);
   else if (id === 'snare') playSnare(t, v, overrides);
   else if (id === 'hihat') playHihat(t, v, dur > 1, overrides);
@@ -1745,7 +1755,7 @@ function scheduleStep(step, t) {
             override[yp] = range.min + (n.yVal ?? n.vel) * (range.max - range.min);
           }
         }
-        triggerInst(inst.id, t + swingOff, n.vel, n.dur, override);
+        triggerInst(inst.id, t + swingOff, n.vel, n.dur, { ...override, reversed: n.reversed });
       }
     }
   }
@@ -1898,9 +1908,29 @@ function renderBand(instId) {
     }
     cx.globalAlpha = 1;
 
-    // Top stripe
+    // Top stripe — points left if reversed
     cx.fillStyle = col;
-    cx.fillRect(x + 1.5, ny, durW - 2, 2.5);
+    if (n.reversed) {
+      // Diagonal slash to indicate reversed
+      cx.save();
+      cx.beginPath();
+      if (cx.roundRect) cx.roundRect(x + 1.5, ny, durW - 2, 2.5, 1);
+      else cx.rect(x + 1.5, ny, durW - 2, 2.5);
+      cx.fillStyle = '#fff';
+      cx.globalAlpha = 0.7;
+      cx.fill();
+      cx.restore();
+      // ◀ label
+      cx.fillStyle = '#fff';
+      cx.globalAlpha = 0.8;
+      cx.font = `bold ${Math.min(9, stepW * 0.5)}px JetBrains Mono, monospace`;
+      cx.textAlign = 'left';
+      cx.textBaseline = 'top';
+      cx.fillText('◀', x + 4, ny + 4);
+      cx.globalAlpha = 1;
+    } else {
+      cx.fillRect(x + 1.5, ny, durW - 2, 2.5);
+    }
 
     // Diagonal hatch for entangled notes
     if (n.entangled && instYParam[instId]) {
@@ -2073,22 +2103,21 @@ function setupBandEvents(instId, canvas) {
     const others = (notes[instId] || []).filter(o => o !== n);
 
     if (ds.mode === 'resize-right') {
-      // Find the hard limit: rightmost we can push without any neighbour going below dur=1
+      // Allow dragging past the left edge of the note — this reverses it
+      if (cursorStep < n.step) {
+        // Crossed into negative territory — return a reversed preview
+        const newStart = Math.max(0, cursorStep);
+        return { step: newStart, dur: n.step - newStart, affected: [], willReverse: true };
+      }
+      // Normal right-resize: find hard limit from right neighbours
       const rightNeighbours = others
         .filter(o => o.step >= n.step)
         .sort((a, b) => a.step - b.step);
-      let maxEnd = steps;
-      let frontier = cursorStep;
-      // Walk forward to check if all neighbours can fit
       let testFrontier = Math.max(n.step + 1, Math.min(steps, cursorStep));
       for (const o of rightNeighbours) {
         if (o.step < testFrontier) {
           const squeezed = (o.step + o.dur) - testFrontier;
-          if (squeezed < 1) {
-            // Clamp newEnd so this note stays at exactly dur=1
-            testFrontier = o.step + o.dur - 1;
-            break;
-          }
+          if (squeezed < 1) { testFrontier = o.step + o.dur - 1; break; }
           testFrontier = testFrontier + squeezed;
         } else break;
       }
@@ -2107,6 +2136,11 @@ function setupBandEvents(instId, canvas) {
 
     if (ds.mode === 'resize-left') {
       const origEnd = ds.origStep + ds.origDur;
+      // Allow dragging past the right edge — this reverses it
+      if (cursorStep >= origEnd) {
+        const newEnd = Math.min(steps, cursorStep + 1);
+        return { step: origEnd, dur: newEnd - origEnd, affected: [], willReverse: true };
+      }
       const leftNeighbours = others
         .filter(o => o.step + o.dur <= ds.origStep + 0.01)
         .sort((a, b) => b.step - a.step);
@@ -2115,10 +2149,7 @@ function setupBandEvents(instId, canvas) {
         const oEnd = o.step + o.dur;
         if (oEnd > testFrontier) {
           const squeezed = testFrontier - o.step;
-          if (squeezed < 1) {
-            testFrontier = o.step + 1;
-            break;
-          }
+          if (squeezed < 1) { testFrontier = o.step + 1; break; }
           testFrontier = o.step;
         } else break;
       }
@@ -2264,7 +2295,10 @@ function setupBandEvents(instId, canvas) {
     if (ds.mode === 'resize-right' || ds.mode === 'resize-left') {
       if (ds.preview) {
         ds.hitNote.step = Math.round(ds.preview.step);
-        ds.hitNote.dur  = Math.round(ds.preview.dur);
+        ds.hitNote.dur  = Math.max(1, Math.round(ds.preview.dur));
+        if (ds.preview.willReverse) {
+          ds.hitNote.reversed = !ds.hitNote.reversed;
+        }
         for (const a of ds.preview.affected) {
           a.note.step = Math.round(a.step);
           a.note.dur  = Math.round(a.dur);
@@ -3070,6 +3104,7 @@ async function startLiveRecord(instId, btn) {
       const durSteps = Math.max(1, Math.round(decoded.duration / stepDur()));
       instSamples[instId] = decoded;
       instSampleBeats[instId] = durSteps;
+      instSamplesRev[instId] = null; // clear reversed cache
       buildFXChain(instId);
       btn.classList.add('sampled');
       if (instId === selectedInst) renderSynthPanel();
@@ -3730,6 +3765,7 @@ document.getElementById('sm-confirm').addEventListener('click', () => {
 
   instSamples[sampleInstId] = finalBuffer;
   instSampleBeats[sampleInstId] = finalBeats;
+  instSamplesRev[sampleInstId] = null; // clear reversed cache
   buildFXChain(sampleInstId);
   if (sampleInstId === selectedInst) renderSynthPanel();
   const recBtn = document.getElementById('rec-' + sampleInstId);
@@ -4004,6 +4040,7 @@ document.getElementById('save-preset-item').addEventListener('click', () => {
 document.getElementById('clear-samples-item').addEventListener('click', () => {
   INSTRUMENTS.forEach(inst => {
     instSamples[inst.id] = null;
+    instSamplesRev[inst.id] = null;
     teardownFXChain(inst.id);
     const btn = document.getElementById('rec-' + inst.id);
     if (btn) btn.classList.remove('sampled');
@@ -4087,9 +4124,7 @@ function openMasterFX() {
   });
 }
 
-document.getElementById('master-fx-item').addEventListener('click', () => {
-  gearMenu.classList.remove('open');
-  gearBtn.classList.remove('active');
+document.getElementById('master-fx-btn').addEventListener('click', () => {
   openMasterFX();
 });
 
