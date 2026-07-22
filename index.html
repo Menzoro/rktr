@@ -787,6 +787,11 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
           <div class="gear-toggle active" id="autoplay-toggle"></div>
         </div>
         <div class="gear-divider"></div>
+        <div class="gear-item" id="midi-item">
+          <span id="midi-label">MIDI sync</span>
+          <div class="gear-toggle" id="midi-toggle"></div>
+        </div>
+        <div class="gear-divider"></div>
         <div class="gear-item" style="cursor:default;">
           <span>Steps</span>
           <div style="display:flex;gap:3px;">
@@ -1781,6 +1786,7 @@ function startSeq() {
   nextStepTime = seqStartTime;
   scheduler();
   visualRaf = requestAnimationFrame(visualTick);
+  startMidiClock();   // MIDI SYNC: Start + clock to Minilogue
 }
 
 function stopSeq() {
@@ -1790,6 +1796,7 @@ function stopSeq() {
   visualRaf = null;
   lastRenderedStep = -1;
   renderAll();
+  stopMidiClock();    // MIDI SYNC: Stop
 }
 
 // ── Visual sync ────────────────────────────────────────────────────
@@ -3812,6 +3819,90 @@ document.getElementById('glow-item').addEventListener('click', () => {
 document.getElementById('autoplay-item').addEventListener('click', () => {
   autoPlayOnPlace = !autoPlayOnPlace;
   document.getElementById('autoplay-toggle').classList.toggle('active', autoPlayOnPlace);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// MODULE: MIDI SYNC  (Minilogue clock master)
+// Broadcasts MIDI clock (24 PPQN) + Start/Stop to EVERY output whose
+// name matches /minilogue/ — clock is channel-less System Real-Time,
+// so hitting both of the Minilogue's ports removes any port-picking.
+// Immediate send() only: this WebView ignores timestamped send().
+// ═══════════════════════════════════════════════════════════════════
+let midiAccess   = null;
+let clockOuts    = [];      // all matching Minilogue output ports
+let midiSyncOn   = false;   // user toggle
+let clockTimer   = null;
+let clockNextT   = 0;       // performance.now() ms of next pulse
+const CLOCK_PPQN = 24;
+
+function midiClockInterval() { return 60000 / bpm / CLOCK_PPQN; }
+
+async function initMidiSync() {
+  if (!navigator.requestMIDIAccess) {
+    setMidiLabel('MIDI n/a'); return false;
+  }
+  try {
+    midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+    midiAccess.onstatechange = bindClockOuts;
+    await bindClockOuts();
+    return true;
+  } catch (e) {
+    setMidiLabel('MIDI denied');
+    return false;
+  }
+}
+
+async function bindClockOuts() {
+  if (!midiAccess) return;
+  clockOuts = [...midiAccess.outputs.values()].filter(o => /minilogue/i.test(o.name));
+  for (const o of clockOuts) { try { await o.open(); } catch (e) {} }
+  updateMidiLabel();
+  // If sync is on and we're already playing, (re)start the clock now that a port appeared
+  if (midiSyncOn && isPlaying && clockOuts.length) startMidiClock();
+}
+
+function updateMidiLabel() {
+  if (!midiSyncOn)            { setMidiLabel('MIDI sync'); return; }
+  if (!clockOuts.length)     { setMidiLabel('MIDI · no synth'); return; }
+  setMidiLabel('MIDI · ' + clockOuts.length + ' port' + (clockOuts.length > 1 ? 's' : ''));
+}
+function setMidiLabel(txt) {
+  const el = document.getElementById('midi-label');
+  if (el) el.textContent = txt;
+}
+
+function startMidiClock() {
+  if (!midiSyncOn || !clockOuts.length) return;
+  clearTimeout(clockTimer);
+  clockNextT = performance.now();
+  clockOuts.forEach(o => { try { o.send([0xFA]); } catch (e) {} });   // Start
+  clockLoop();
+}
+function clockLoop() {
+  if (!midiSyncOn || !isPlaying || !clockOuts.length) return;
+  clockOuts.forEach(o => { try { o.send([0xF8]); } catch (e) {} });   // Clock pulse
+  clockNextT += midiClockInterval();
+  clockTimer = setTimeout(clockLoop, Math.max(0, clockNextT - performance.now()));
+}
+function stopMidiClock() {
+  clearTimeout(clockTimer);
+  clockTimer = null;
+  clockOuts.forEach(o => { try { o.send([0xFC]); } catch (e) {} });   // Stop
+}
+
+// Gear toggle: first enable requests MIDI access (needs this user gesture)
+document.getElementById('midi-item').addEventListener('click', async () => {
+  midiSyncOn = !midiSyncOn;
+  document.getElementById('midi-toggle').classList.toggle('active', midiSyncOn);
+  if (midiSyncOn) {
+    const ok = await initMidiSync();
+    if (!ok) { midiSyncOn = false; document.getElementById('midi-toggle').classList.remove('active'); return; }
+    updateMidiLabel();
+    if (isPlaying) startMidiClock();     // already playing? lock immediately
+  } else {
+    stopMidiClock();
+    setMidiLabel('MIDI sync');
+  }
 });
 
 // ── Transport controls ─────────────────────────────────────────────
