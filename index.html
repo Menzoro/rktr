@@ -3859,7 +3859,7 @@ let midiAccess   = null;
 let clockOuts    = [];      // all matching Minilogue output ports
 let midiSyncOn   = false;   // user toggle
 let clockTimer   = null;
-let clockNextT   = 0;       // performance.now() ms of next pulse
+let clockNextAC  = 0;       // AC.currentTime (seconds) of the next pulse
 let midiSyncOffsetMs = 0;   // delay the synth this many ms to match drum-audio output latency
 const CLOCK_PPQN = 24;
 
@@ -3902,21 +3902,24 @@ function setMidiLabel(txt) {
 function startMidiClock() {
   if (!midiSyncOn || !clockOuts.length) return;
   clearTimeout(clockTimer);
-  const begin = () => {
-    clockOuts.forEach(o => { try { o.send([0xFA]); } catch (e) {} });   // Start
-    clockNextT = performance.now();
-    clockLoop();
-  };
-  // Delay the whole synth start by the offset so its notes line up with the
-  // latency-delayed drum audio coming back through the Minilogue's audio in.
-  if (midiSyncOffsetMs > 0) clockTimer = setTimeout(begin, midiSyncOffsetMs);
-  else begin();
+  clockOuts.forEach(o => { try { o.send([0xFA]); } catch (e) {} });   // Start
+  // Anchor the clock to the SAME timeline as the drum audio (AC.currentTime),
+  // not performance.now() — so the two can never drift apart. seqStartTime is
+  // the audio's step-0 time; offset delays the synth to match drum-audio latency.
+  clockNextAC = seqStartTime + midiSyncOffsetMs / 1000;
+  clockDriver();
 }
-function clockLoop() {
+// Emits every pulse whose audio-clock time has arrived. Gated on AC.currentTime,
+// so it locks to the audio grid; jitter is ~poll interval, drift is zero.
+function clockDriver() {
   if (!midiSyncOn || !isPlaying || !clockOuts.length) return;
-  clockOuts.forEach(o => { try { o.send([0xF8]); } catch (e) {} });   // Clock pulse
-  clockNextT += midiClockInterval();
-  clockTimer = setTimeout(clockLoop, Math.max(0, clockNextT - performance.now()));
+  const interval = 60 / bpm / CLOCK_PPQN;   // seconds per pulse
+  const now = AC.currentTime;
+  while (clockNextAC <= now) {
+    clockOuts.forEach(o => { try { o.send([0xF8]); } catch (e) {} });
+    clockNextAC += interval;
+  }
+  clockTimer = setTimeout(clockDriver, 4);   // tight poll against the audio clock
 }
 function stopMidiClock() {
   clearTimeout(clockTimer);
@@ -3946,7 +3949,7 @@ document.getElementById('midi-offset').addEventListener('input', function () {
   const delta = v - midiSyncOffsetMs;
   midiSyncOffsetMs = v;
   document.getElementById('midi-offset-val').textContent = v + 'ms';
-  if (isPlaying && clockOuts.length && clockTimer !== null) clockNextT += delta;
+  if (isPlaying && clockOuts.length && clockTimer !== null) clockNextAC += delta / 1000;
 });
 
 // ── Transport controls ─────────────────────────────────────────────
