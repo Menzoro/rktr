@@ -159,7 +159,13 @@ function onMidiIn(e){
   else if(s<0xF8){ var h=[]; for(var i=0;i<d.length;i++) h.push(d[i].toString(16)); log('◄ '+h.join(' ')); }
 }
 
-$('port-select').addEventListener('change',function(){ out=Array.from(midi.outputs.values())[+this.value]; refresh(); });
+$('port-select').addEventListener('change',async function(){
+  out=Array.from(midi.outputs.values())[+this.value];
+  try{ await out.open(); }catch(e){ log('out.open failed: '+e.message,'err'); }
+  var oState=out?out.connection:'none', iState=inPort?inPort.connection:'none';
+  setStatus('out: '+(out?out.name:'—')+' ['+oState+']    in: '+(inPort?inPort.name:'—')+' ['+iState+']',(oState==='open')?'ok':'err');
+  log('► out port set: '+out.name);
+});
 $('in-select').addEventListener('change',function(){ bindInput(Array.from(midi.inputs.values())[+this.value]); });
 $('mode-imm').addEventListener('click',function(){ setMode('imm'); });
 $('mode-sched').addEventListener('click',function(){ setMode('sched'); });
@@ -168,9 +174,10 @@ function setMode(m){ mode=m; $('mode-imm').classList.toggle('on',m==='imm'); $('
 $('testnote').addEventListener('click',function(){
   if(!out){ return; }
   var ch=(Math.max(1,Math.min(16,+$('chan').value))-1)&0x0F;
-  out.send([0x90|ch,60,100]);                       // note on middle C
-  setTimeout(function(){ out.send([0x80|ch,60,0]); },400); // note off
-  log('► test note sent (ch '+(ch+1)+')');
+  // Sweep CC 43 (filter cutoff) — the exact message CataLogue proved works
+  var v=0;
+  var iv=setInterval(function(){ out.send([0xB0|ch,43,v]); v+=8; if(v>127){clearInterval(iv);} },20);
+  log('► CC43 filter sweep sent (ch '+(ch+1)+') — watch the cutoff');
 });
 
 // Immediate: one pulse per tick, no timestamps (CataLogue-proven path)
