@@ -6,198 +6,181 @@
 <title>MIDI Clock Test</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body {
-    margin: 0; padding: 20px;
-    background: #080810; color: #d8d8f0;
-    font-family: 'JetBrains Mono', 'Courier New', monospace;
-    font-size: 14px; line-height: 1.5;
-  }
-  h1 { font-size: 16px; color: #00e5c8; letter-spacing: 0.1em; margin: 0 0 16px; }
-  .row { display: flex; align-items: center; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
-  label { font-size: 11px; color: #55556a; text-transform: uppercase; letter-spacing: 0.1em; }
-  button, select, input {
-    font-family: inherit; font-size: 13px;
-    background: #18182a; color: #d8d8f0;
-    border: 1px solid #2a2a40; border-radius: 4px;
-    padding: 8px 12px; cursor: pointer;
-  }
-  button:active { transform: scale(0.96); }
-  button.on { background: #00e5c8; color: #000; border-color: #00e5c8; }
-  button:disabled { opacity: 0.4; cursor: default; }
-  #status { padding: 10px 12px; border-radius: 4px; background: #10101a; border: 1px solid #2a2a40; min-height: 18px; }
-  #status.ok  { border-color: #2dffa0; color: #2dffa0; }
-  #status.err { border-color: #ff5e2a; color: #ff5e2a; }
-  #beat {
-    width: 60px; height: 60px; border-radius: 50%;
-    background: #18182a; border: 2px solid #2a2a40;
-    transition: none;
-  }
-  #beat.flash { background: #00e5c8; border-color: #00e5c8; }
-  .stat { font-size: 12px; color: #55556a; }
-  .stat b { color: #d8d8f0; }
-  .note { font-size: 11px; color: #55556a; margin-top: 20px; border-top: 1px solid #2a2a40; padding-top: 12px; }
-  code { color: #ffe040; }
+  body { margin:0; padding:20px; background:#080810; color:#d8d8f0;
+    font-family:'JetBrains Mono','Courier New',monospace; font-size:14px; line-height:1.5; }
+  h1 { font-size:16px; color:#00e5c8; letter-spacing:0.1em; margin:0 0 16px; }
+  h2 { font-size:11px; color:#55556a; letter-spacing:0.1em; text-transform:uppercase; margin:22px 0 8px; }
+  .row { display:flex; align-items:center; gap:10px; margin:10px 0; flex-wrap:wrap; }
+  label { font-size:11px; color:#55556a; text-transform:uppercase; letter-spacing:0.1em; }
+  button, select, input { font-family:inherit; font-size:13px; background:#18182a; color:#d8d8f0;
+    border:1px solid #2a2a40; border-radius:4px; padding:8px 12px; cursor:pointer; }
+  button:active { transform:scale(0.96); }
+  button.on { background:#00e5c8; color:#000; border-color:#00e5c8; }
+  button:disabled { opacity:0.4; cursor:default; }
+  #status { padding:10px 12px; border-radius:4px; background:#10101a; border:1px solid #2a2a40; min-height:18px; }
+  #status.ok { border-color:#2dffa0; color:#2dffa0; }
+  #status.err { border-color:#ff5e2a; color:#ff5e2a; }
+  #beat { width:50px; height:50px; border-radius:50%; background:#18182a; border:2px solid #2a2a40; }
+  #beat.flash { background:#00e5c8; border-color:#00e5c8; }
+  .stat { font-size:12px; color:#55556a; } .stat b { color:#d8d8f0; }
+  #monitor { background:#10101a; border:1px solid #2a2a40; border-radius:4px; padding:10px;
+    height:130px; overflow-y:auto; font-size:11px; white-space:pre-wrap; color:#8888a0; }
+  #monitor .in-clock { color:#2dffa0; } #monitor .in-note { color:#ffe040; }
+  .seg { display:inline-flex; border:1px solid #2a2a40; border-radius:4px; overflow:hidden; }
+  .seg button { border:none; border-radius:0; }
+  .seg button:not(:last-child) { border-right:1px solid #2a2a40; }
+  .note { font-size:11px; color:#55556a; margin-top:20px; border-top:1px solid #2a2a40; padding-top:12px; }
+  code { color:#ffe040; }
 </style>
 </head>
 <body>
-<h1>BYRG · MIDI CLOCK TEST</h1>
+<h1>BYRG · MIDI CLOCK TEST v2</h1>
 
-<div class="row">
-  <button id="connect">Connect MIDI</button>
-</div>
-
-<div class="row">
-  <label>Port</label>
-  <select id="port-select" disabled><option>— connect first —</option></select>
-</div>
-
+<div class="row"><button id="connect">Connect MIDI</button></div>
+<div class="row"><label>Out</label><select id="port-select" disabled><option>— connect first —</option></select></div>
+<div class="row"><label>In</label><select id="in-select" disabled><option>— connect first —</option></select></div>
 <div id="status">Not connected.</div>
 
-<div class="row" style="margin-top:20px;">
+<h2>Send clock</h2>
+<div class="row">
   <label>BPM</label>
-  <input id="bpm" type="number" value="120" min="40" max="240" style="width:80px;">
+  <input id="bpm" type="number" value="120" min="40" max="240" style="width:70px;">
+  <div class="seg"><button id="mode-sched" class="on">Timestamped</button><button id="mode-imm">Immediate</button></div>
+</div>
+<div class="row">
   <button id="start" disabled>▶ Start</button>
   <button id="stop" disabled>■ Stop</button>
+  <div id="beat"></div>
+  <div class="stat">sent: <b id="pulse-count">0</b> · <b id="run-secs">0.0</b>s · tempo <b id="meas-bpm">—</b></div>
 </div>
 
-<div class="row" style="margin-top:20px;">
-  <div id="beat"></div>
-  <div class="stat">
-    pulses sent: <b id="pulse-count">0</b><br>
-    running: <b id="run-secs">0.0</b>s<br>
-    measured tempo: <b id="meas-bpm">—</b> BPM
-  </div>
-</div>
+<h2>Input monitor (touch the synth — do bytes appear?)</h2>
+<div id="monitor">Waiting…</div>
+<div class="row"><button id="clear-mon">Clear</button></div>
 
 <div class="note">
-  <b>What this tests:</b> whether your WebView honours timestamped <code>send()</code>.<br><br>
-  1. Set Minilogue <b>Clock Source = Auto</b> (or External) in global settings.<br>
-  2. Plug in via USB, hit <b>Connect MIDI</b>, confirm the port auto-selects.<br>
-  3. Set a BPM, hit <b>Start</b>. The Minilogue's arp/sequencer/delay should lock to it.<br>
-  4. Watch <b>measured tempo</b> — if it sits steady on your target BPM, timestamps work.
-  If it jumps around, the WebView is ignoring timestamps (the risk we flagged).<br><br>
-  Uses <code>performance.now()</code> as the clock base — same time domain as MIDI
-  timestamps, so this isolates the timestamp question from the audio-clock question.
+  <b>Two things this isolates:</b><br>
+  1. <b>Input monitor</b> — play the Minilogue's keys or run its own sequencer. If bytes show
+  here, the USB link works both ways and permissions are fine, so the issue is the synth not
+  accepting <i>our</i> clock. If nothing appears, the link itself is one-way / broken.<br>
+  2. <b>Timestamped vs Immediate</b> — if the synth follows only in Immediate mode, the WebView
+  is ignoring timestamps and the real app needs a tighter clock loop.
 </div>
 
 <script>
-let midi = null;
-let out  = null;
-let running = false;
-let timerID = null;
-let nextPulseTime = 0;      // performance.now() ms
-let startPerf = 0;
-let pulseCount = 0;
-let lastBeatFlash = -1;
+let midi=null, out=null, inPort=null;
+let running=false, timerID=null;
+let nextPulseTime=0, startPerf=0, pulseCount=0, lastBeatFlash=-1;
+let mode='sched';
+let clockInCount=0, lastClockInLog=0;
+const PPQN=24, LOOKAHEAD_MS=100, TICK_MS=25;
+const $=id=>document.getElementById(id);
+const setStatus=(m,c='')=>{const s=$('status');s.textContent=m;s.className=c;};
 
-const PPQN = 24;
-const LOOKAHEAD_MS = 100;   // schedule this far ahead
-const TICK_MS = 25;         // scheduler wake interval
-
-const $ = id => document.getElementById(id);
-
-function setStatus(msg, cls = '') {
-  const s = $('status'); s.textContent = msg; s.className = cls;
+function log(msg,cls=''){
+  const m=$('monitor');
+  if(m.textContent==='Waiting…')m.textContent='';
+  const line=document.createElement('div');
+  if(cls)line.className=cls;
+  line.textContent=msg; m.appendChild(line);
+  while(m.children.length>200)m.removeChild(m.firstChild);
+  m.scrollTop=m.scrollHeight;
 }
 
-async function connect() {
-  if (!navigator.requestMIDIAccess) {
-    setStatus('Web MIDI not available. Use Chrome / a Chromium WebView, over HTTPS or localhost.', 'err');
-    return;
-  }
-  try {
-    midi = await navigator.requestMIDIAccess({ sysex: false });
-    midi.onstatechange = refreshPorts;
-    refreshPorts();
-  } catch (e) {
-    setStatus('MIDI access denied: ' + e.message, 'err');
-  }
+async function connect(){
+  if(!navigator.requestMIDIAccess){setStatus('Web MIDI not available. Chromium + HTTPS/localhost required.','err');return;}
+  try{ midi=await navigator.requestMIDIAccess({sysex:false}); midi.onstatechange=refresh; refresh(); }
+  catch(e){ setStatus('MIDI access denied: '+e.message,'err'); }
 }
 
-function refreshPorts() {
-  const outs = [...midi.outputs.values()];
-  const sel = $('port-select');
-  sel.innerHTML = '';
-  if (outs.length === 0) {
-    sel.disabled = true;
-    sel.innerHTML = '<option>— no outputs found —</option>';
-    setStatus('No MIDI outputs. Is the Minilogue plugged in and powered?', 'err');
-    out = null;
-    $('start').disabled = true;
-    return;
-  }
-  outs.forEach((o, i) => {
-    const opt = document.createElement('option');
-    opt.value = i; opt.textContent = o.name;
-    sel.appendChild(opt);
-  });
-  sel.disabled = false;
-
-  // Auto-pick the Minilogue by name
-  const idx = outs.findIndex(o => /minilogue/i.test(o.name));
-  const pick = idx >= 0 ? idx : 0;
-  sel.value = pick;
-  out = outs[pick];
-  setStatus('✓ ' + out.name + (idx >= 0 ? '  (auto-detected)' : '  (name not matched — picked first)'),
-            idx >= 0 ? 'ok' : '');
-  $('start').disabled = false;
+function refresh(){
+  const outs=[...midi.outputs.values()], ins=[...midi.inputs.values()];
+  fillSelect($('port-select'),outs,'no outputs');
+  fillSelect($('in-select'),ins,'no inputs');
+  if(outs.length){ const i=outs.findIndex(o=>/minilogue/i.test(o.name)); $('port-select').value=i>=0?i:0; out=outs[i>=0?i:0]; $('start').disabled=false; }
+  if(ins.length){ const i=ins.findIndex(o=>/minilogue/i.test(o.name)); $('in-select').value=i>=0?i:0; bindInput(ins[i>=0?i:0]); }
+  setStatus('✓ out: '+(out?out.name:'—')+'   in: '+(inPort?inPort.name:'—'), out?'ok':'err');
 }
 
-$('port-select').addEventListener('change', function () {
-  const outs = [...midi.outputs.values()];
-  out = outs[+this.value];
-  setStatus('✓ ' + out.name, 'ok');
-});
-
-function scheduler() {
-  const now = performance.now();
-  const pulseInt = 60000 / (+$('bpm').value) / PPQN;
-  while (nextPulseTime < now + LOOKAHEAD_MS) {
-    out.send([0xF8], nextPulseTime);   // timestamped clock pulse
-    pulseCount++;
-    nextPulseTime += pulseInt;
-  }
-  timerID = setTimeout(scheduler, TICK_MS);
+function fillSelect(sel,ports,emptyMsg){
+  sel.innerHTML='';
+  if(!ports.length){sel.disabled=true;sel.innerHTML='<option>— '+emptyMsg+' —</option>';return;}
+  ports.forEach((p,i)=>{const o=document.createElement('option');o.value=i;o.textContent=p.name;sel.appendChild(o);});
+  sel.disabled=false;
 }
 
-function visual() {
-  if (!running) return;
-  const elapsed = (performance.now() - startPerf) / 1000;
-  $('run-secs').textContent = elapsed.toFixed(1);
-  $('pulse-count').textContent = pulseCount;
-  if (elapsed > 0.5) $('meas-bpm').textContent = (pulseCount / PPQN / (elapsed / 60)).toFixed(1);
+function bindInput(port){ if(inPort)inPort.onmidimessage=null; inPort=port; inPort.onmidimessage=onMidiIn; }
 
-  const beat = Math.floor(elapsed * (+$('bpm').value) / 60);
-  const b = $('beat');
-  if (beat !== lastBeatFlash) { lastBeatFlash = beat; b.classList.add('flash'); }
-  else if (performance.now() - startPerf) b.classList.remove('flash');
+function onMidiIn(e){
+  const d=e.data, s=d[0];
+  if(s===0xF8){
+    clockInCount++;
+    const now=performance.now();
+    if(now-lastClockInLog>1000){
+      log('◄ clock in: '+clockInCount+' pulses in last sec','in-clock');
+      clockInCount=0; lastClockInLog=now;
+    }
+  }
+  else if(s===0xFA) log('◄ START','in-clock');
+  else if(s===0xFC) log('◄ STOP','in-clock');
+  else if((s&0xF0)===0x90) log('◄ note on '+d[1]+' vel '+d[2],'in-note');
+  else if((s&0xF0)===0x80) log('◄ note off '+d[1],'in-note');
+  else if((s&0xF0)===0xB0) log('◄ CC '+d[1]+' = '+d[2],'in-note');
+  else if(s<0xF8) log('◄ '+[...d].map(b=>b.toString(16)).join(' '));
+}
+
+$('port-select').addEventListener('change',function(){ out=[...midi.outputs.values()][+this.value]; refresh(); });
+$('in-select').addEventListener('change',function(){ bindInput([...midi.inputs.values()][+this.value]); });
+$('mode-sched').addEventListener('click',()=>setMode('sched'));
+$('mode-imm').addEventListener('click',()=>setMode('imm'));
+function setMode(m){ mode=m; $('mode-sched').classList.toggle('on',m==='sched'); $('mode-imm').classList.toggle('on',m==='imm'); }
+
+function schedLoop(){
+  const now=performance.now();
+  const pulseInt=60000/(+$('bpm').value)/PPQN;
+  while(nextPulseTime<now+LOOKAHEAD_MS){ out.send([0xF8],nextPulseTime); pulseCount++; nextPulseTime+=pulseInt; }
+  timerID=setTimeout(schedLoop,TICK_MS);
+}
+function immLoop(){
+  if(!running)return;
+  const pulseInt=60000/(+$('bpm').value)/PPQN;
+  out.send([0xF8]); pulseCount++; nextPulseTime+=pulseInt;
+  timerID=setTimeout(immLoop,Math.max(0,nextPulseTime-performance.now()));
+}
+
+function visual(){
+  if(!running)return;
+  const el=(performance.now()-startPerf)/1000;
+  $('run-secs').textContent=el.toFixed(1);
+  $('pulse-count').textContent=pulseCount;
+  if(el>0.5)$('meas-bpm').textContent=(pulseCount/PPQN/(el/60)).toFixed(1);
+  const beat=Math.floor(el*(+$('bpm').value)/60);
+  if(beat!==lastBeatFlash){lastBeatFlash=beat;$('beat').classList.add('flash');}
+  else $('beat').classList.remove('flash');
   requestAnimationFrame(visual);
 }
 
-function start() {
-  if (!out || running) return;
-  running = true;
-  pulseCount = 0; lastBeatFlash = -1;
-  startPerf = performance.now();
-  nextPulseTime = startPerf + 20;
-  out.send([0xFA], nextPulseTime - 1);   // Start, just before first clock
-  scheduler();
+function start(){
+  if(!out||running)return;
+  running=true; pulseCount=0; lastBeatFlash=-1;
+  startPerf=performance.now(); nextPulseTime=startPerf+20;
+  out.send([0xFA], mode==='sched'?nextPulseTime-1:undefined);
+  (mode==='sched'?schedLoop:immLoop)();
   requestAnimationFrame(visual);
   $('start').classList.add('on'); $('stop').classList.remove('on');
 }
-
-function stop() {
-  if (!running) return;
-  running = false;
-  clearTimeout(timerID); timerID = null;
-  if (out) out.send([0xFC]);   // Stop
+function stop(){
+  if(!running)return;
+  running=false; clearTimeout(timerID); timerID=null;
+  if(out)out.send([0xFC]);
   $('start').classList.remove('on'); $('stop').classList.add('on');
   $('beat').classList.remove('flash');
 }
 
-$('connect').addEventListener('click', connect);
-$('start').addEventListener('click', start);
-$('stop').addEventListener('click', stop);
+$('connect').addEventListener('click',connect);
+$('start').addEventListener('click',start);
+$('stop').addEventListener('click',stop);
+$('clear-mon').addEventListener('click',()=>{$('monitor').textContent='Waiting…';});
 </script>
 </body>
 </html>
