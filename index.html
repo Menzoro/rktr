@@ -17,6 +17,69 @@
         locks on at least one non-Korg device.
     [ ] Consider optional pre-roll (start clock ~1s before sequencer) to
         hide the follower PLL glide-in on Start.
+
+  SYNC OFFSET / CLOCK (see MODULE: MIDI SYNC):
+    - Clock is anchored to AC.currentTime (same master as drum audio) so the
+      two cannot drift. Offset slider = constant nudge for DAC output latency.
+    - The Minilogue sequencer is pulse-driven: shifting all pulses = shifting
+      the whole synth performance. Offset only delays the synth (one-way);
+      drums can't be advanced (no retroactive audio).
+    - Idea: feed BYRG's existing swing into the clock so the synth swings in
+      lockstep with the drums (per-pulse timing, not anchor shift).
+
+  Y-PARAM / ENTANGLE — design notes:
+    - Note "height" is a SINGLE value: it sets vel AND yVal together
+      (see ~"keep yVal in sync with vel drag"). So loudness and param
+      intensity are locked, not independent.
+    - This is intentional: entangle gives per-note customization without
+      exploding the option count per note. Full independence per note would
+      be too many controls and users would just set one value for all.
+    - Coupling is GOOD for accent-type params (delay send, drive): louder =
+      wetter/grittier, a natural accent. It only limits inverse intentions
+      (quiet-but-bright, loud-but-dark). Decoupling would need a 2nd gesture
+      (horizontal drag / two-finger) — only add if inverse cases are wanted.
+    - Enable path (currently unintuitive): long-press instrument label ->
+      Y-param picker -> pick param -> tap notes to entangle -> drag height.
+    - Add memory to enable / disable all, so accidental touch does not erase
+      all accents
+
+  UX FRICTION to address:
+    [ ] Record buttons may take too much horizontal real estate — review the
+        band-rec column width; consider collapsing/merging into the label.
+    [ ] After arming a track (setting its Y-param), it's hard to then select
+        that instrument as the shown synth engine at the bottom. The label
+        long-press is captured by the Y-param picker, so the normal select
+        gesture is hard to reach. Needs a clearer separation: e.g. tap =
+        select engine, long-press = Y-param, and make the armed state not
+        block selection.
+
+  DELAY:
+    - Delay is a per-note SEND, not a master insert. masterGain -> delayDry
+      only; the delay node's sole input is per-note delaySend (Y-param
+      "Delay send"). So Master FX delay sliders do nothing until notes send.
+    - Working as intended for dub-accent-on-select-notes (liked).
+    - Optional: add a global master-delay send (masterGain -> delayNode via a
+      send gain) so the Master FX delay also works on the whole mix.
+
+  ROADMAP — biggest wins (priority order):
+    1. PLAY MODE (Ableton Session-style): store multiple patterns, a launch
+       grid to trigger them live. This is the missing arrangement layer that
+       turns BYRG from a loop into a performable instrument. Must NOT drop the
+       Minilogue clock when launching a pattern (keep clock running across
+       pattern switches).
+    2. WEIRD SOUND MODS: bitcrush + sample-rate reduction (cheap, huge
+       character); stutter/repeat performance FX. Add as master-insert or
+       per-track.
+    3. Conditional trigs (every-2nd-loop, 1st-of-4-bars) IF revisiting
+       generative ideas — NOT random per-step probability (tried in CataLogue,
+       felt unmusical; deterministic conditions feel musical, dice don't).
+
+  HARDWARE NOTE:
+    - Pocket Operators considered: BYRG already exceeds them on synthesis,
+      sampling, p-locks, FX, MIDI sync. Value of a PO is tactility/constraint/
+      inspiration as an object, not features. PO-33 (sampling) or PO-32 Tonic
+      (Sonic Charge engine, sysex-importable) are the two that could feed
+      ideas back. One is enough.
   ═══════════════════════════════════════════════════════════════════
 -->
 <html lang="en">
@@ -2312,8 +2375,8 @@ function setupBandEvents(instId, canvas) {
 
     if (ds.mode === 'vel' || ds.mode === 'move' || ds.mode === 'pending-hit') {
       if (ds.mode === 'pending-hit' && ds.hitNote) {
-        // Single tap on note body — toggle entanglement if Y-param set
-        if (instYParam[instId] !== null) {
+        // Single tap on note body — toggle entanglement only while in edit mode
+        if (instArmed[instId]) {
           ds.hitNote.entangled = !ds.hitNote.entangled;
         }
         // No triggerInst here: avoids double-play on double-tap delete
@@ -2414,6 +2477,7 @@ function setupBandEvents(instId, canvas) {
 // ── Per-instrument UI state ────────────────────────────────────────
 const instVol        = { kick:0.9, snare:0.9, hihat:0.9, tom:0.9 };
 const instYParam     = { kick:null, snare:null, hihat:null, tom:null }; // null = vol drag
+const instArmed      = { kick:false, snare:false, hihat:false, tom:false }; // tap-to-entangle edit mode
 const instYParamRange = { kick:{min:0,max:1}, snare:{min:0,max:1}, hihat:{min:0,max:1}, tom:{min:0,max:1} };
 // Saved per-note entanglement state for the 3-way cycle (off → all → saved → off)
 const instEntangleSaved = { kick:null, snare:null, hihat:null, tom:null };
@@ -2455,6 +2519,7 @@ function showYParamPicker(instId, anchorEl) {
       e.stopPropagation();
       const k = opt.dataset.key;
       instYParam[instId] = k === 'none' ? 'none' : k;
+      instArmed[instId] = (k !== 'none');
       if (instYParam[instId] && instYParam[instId] !== 'none') {
         instYParamRange[instId] = { min: +opt.dataset.min, max: +opt.dataset.max };
       }
@@ -2469,7 +2534,7 @@ function updateMuteBtn(instId) {
   const yInd = document.getElementById('yparam-ind-' + instId);
   if (yInd) {
     const param = instYParam[instId];
-    if (param && param !== 'none') {
+    if (instArmed[instId] && param && param !== 'none') {
       yInd.textContent = param.toUpperCase();
       yInd.style.display = 'block';
     } else {
@@ -2566,7 +2631,15 @@ function buildBands() {
       holdTimer = setTimeout(() => {
         didHold = true;
         holdTimer = null;
-        showYParamPicker(inst.id, lbl);
+        if (instArmed[inst.id]) {
+          // Exit edit mode only — keep instYParam + note accents intact.
+          instArmed[inst.id] = false;
+          document.getElementById('yparam-picker').classList.remove('visible');
+          updateMuteBtn(inst.id);
+          renderBand(inst.id);
+        } else {
+          showYParamPicker(inst.id, lbl);
+        }
       }, 400);
       lbl.setPointerCapture(e.pointerId);
     });
@@ -2621,7 +2694,7 @@ function buildBands() {
             renderBand(inst.id);
           } else {
             // Single tap — select instrument / cycle entanglement
-            if (instYParam[inst.id] !== null) {
+            if (instArmed[inst.id]) {
               const ns = notes[inst.id] || [];
               const allOn  = ns.length > 0 && ns.every(n => n.entangled);
               const allOff = ns.every(n => !n.entangled);
