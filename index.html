@@ -1,4 +1,24 @@
 <!DOCTYPE html>
+<!--
+  ═══════════════════════════════════════════════════════════════════
+  BYRG — DEV NOTES
+  ═══════════════════════════════════════════════════════════════════
+  MIDI SYNC (see "MODULE: MIDI SYNC" in the main script):
+    - BYRG is clock master; broadcasts 24-PPQN clock + Start/Stop to all
+      output ports matching /minilogue/. Clock is channel-less.
+    - Immediate send() only — this WebView ignores timestamped send().
+    - Requires secure context (HTTPS / localhost); toggle in gear menu.
+    - Minilogue must be set to Clock Source = Auto (USB).
+
+  TODO before shipping:
+    [ ] Ensure DIFFERENT synths connect properly, not just the Minilogue.
+        The port match is currently hard-coded to /minilogue/ — generalise
+        (device picker, or match-all, or user-set name) and verify clock
+        locks on at least one non-Korg device.
+    [ ] Consider optional pre-roll (start clock ~1s before sequencer) to
+        hide the follower PLL glide-in on Start.
+  ═══════════════════════════════════════════════════════════════════
+-->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -791,6 +811,13 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
           <span id="midi-label">MIDI sync</span>
           <div class="gear-toggle" id="midi-toggle"></div>
         </div>
+        <div class="gear-item" id="midi-offset-item" style="cursor:default;">
+          <span>Sync offset</span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="range" id="midi-offset" min="0" max="250" step="1" value="0" style="width:70px;accent-color:var(--accent);cursor:pointer;">
+            <span id="midi-offset-val" style="font-size:9px;color:var(--accent);min-width:34px;text-align:right;">0ms</span>
+          </div>
+        </div>
         <div class="gear-divider"></div>
         <div class="gear-item" style="cursor:default;">
           <span>Steps</span>
@@ -1040,7 +1067,7 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
 // Future split: audio-context.js + state.js  (or a single store.js)
 // ═══════════════════════════════════════════════════════════════════
 
-const AC = new (window.AudioContext || window.webkitAudioContext)();
+const AC = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
 const masterGain = AC.createGain();
 masterGain.gain.value = 0.85;
 masterGain.connect(AC.destination);
@@ -3833,6 +3860,7 @@ let clockOuts    = [];      // all matching Minilogue output ports
 let midiSyncOn   = false;   // user toggle
 let clockTimer   = null;
 let clockNextT   = 0;       // performance.now() ms of next pulse
+let midiSyncOffsetMs = 0;   // delay the synth this many ms to match drum-audio output latency
 const CLOCK_PPQN = 24;
 
 function midiClockInterval() { return 60000 / bpm / CLOCK_PPQN; }
@@ -3874,9 +3902,15 @@ function setMidiLabel(txt) {
 function startMidiClock() {
   if (!midiSyncOn || !clockOuts.length) return;
   clearTimeout(clockTimer);
-  clockNextT = performance.now();
-  clockOuts.forEach(o => { try { o.send([0xFA]); } catch (e) {} });   // Start
-  clockLoop();
+  const begin = () => {
+    clockOuts.forEach(o => { try { o.send([0xFA]); } catch (e) {} });   // Start
+    clockNextT = performance.now();
+    clockLoop();
+  };
+  // Delay the whole synth start by the offset so its notes line up with the
+  // latency-delayed drum audio coming back through the Minilogue's audio in.
+  if (midiSyncOffsetMs > 0) clockTimer = setTimeout(begin, midiSyncOffsetMs);
+  else begin();
 }
 function clockLoop() {
   if (!midiSyncOn || !isPlaying || !clockOuts.length) return;
@@ -3903,6 +3937,16 @@ document.getElementById('midi-item').addEventListener('click', async () => {
     stopMidiClock();
     setMidiLabel('MIDI sync');
   }
+});
+
+// Sync-offset slider: delays the synth to match drum-audio latency.
+// Adjustable live while playing — shifting the next pulse re-phases the follower.
+document.getElementById('midi-offset').addEventListener('input', function () {
+  const v = +this.value;
+  const delta = v - midiSyncOffsetMs;
+  midiSyncOffsetMs = v;
+  document.getElementById('midi-offset-val').textContent = v + 'ms';
+  if (isPlaying && clockOuts.length && clockTimer !== null) clockNextT += delta;
 });
 
 // ── Transport controls ─────────────────────────────────────────────
