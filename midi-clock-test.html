@@ -89,17 +89,28 @@ function log(msg,cls=''){
 
 async function connect(){
   if(!navigator.requestMIDIAccess){setStatus('Web MIDI not available. Chromium + HTTPS/localhost required.','err');return;}
-  try{ midi=await navigator.requestMIDIAccess({sysex:false}); midi.onstatechange=refresh; refresh(); }
+  try{ midi=await navigator.requestMIDIAccess({sysex:false}); midi.onstatechange=refresh; await refresh(); }
   catch(e){ setStatus('MIDI access denied: '+e.message,'err'); }
 }
 
-function refresh(){
+async function refresh(){
   const outs=[...midi.outputs.values()], ins=[...midi.inputs.values()];
   fillSelect($('port-select'),outs,'no outputs');
   fillSelect($('in-select'),ins,'no inputs');
-  if(outs.length){ const i=outs.findIndex(o=>/minilogue/i.test(o.name)); $('port-select').value=i>=0?i:0; out=outs[i>=0?i:0]; $('start').disabled=false; }
-  if(ins.length){ const i=ins.findIndex(o=>/minilogue/i.test(o.name)); $('in-select').value=i>=0?i:0; bindInput(ins[i>=0?i:0]); }
-  setStatus('✓ out: '+(out?out.name:'—')+'   in: '+(inPort?inPort.name:'—'), out?'ok':'err');
+  if(outs.length){
+    const i=outs.findIndex(o=>/minilogue/i.test(o.name));
+    $('port-select').value=i>=0?i:0; out=outs[i>=0?i:0];
+    try{ await out.open(); }catch(e){ log('out.open failed: '+e.message,'in-note'); }
+    $('start').disabled=false;
+  }
+  if(ins.length){
+    const i=ins.findIndex(o=>/minilogue/i.test(o.name));
+    $('in-select').value=i>=0?i:0;
+    await bindInput(ins[i>=0?i:0]);
+  }
+  const oState=out?out.connection:'none', iState=inPort?inPort.connection:'none';
+  setStatus('out: '+(out?out.name:'—')+' ['+oState+']    in: '+(inPort?inPort.name:'—')+' ['+iState+']',
+            (oState==='open')?'ok':'err');
 }
 
 function fillSelect(sel,ports,emptyMsg){
@@ -109,7 +120,11 @@ function fillSelect(sel,ports,emptyMsg){
   sel.disabled=false;
 }
 
-function bindInput(port){ if(inPort)inPort.onmidimessage=null; inPort=port; inPort.onmidimessage=onMidiIn; }
+async function bindInput(port){
+  if(inPort)inPort.onmidimessage=null;
+  inPort=port; inPort.onmidimessage=onMidiIn;
+  try{ await inPort.open(); }catch(e){ log('in.open failed: '+e.message,'in-note'); }
+}
 
 function onMidiIn(e){
   const d=e.data, s=d[0];
