@@ -27,10 +27,29 @@
     - Idea: feed BYRG's existing swing into the clock so the synth swings in
       lockstep with the drums (per-pulse timing, not anchor shift).
 
-  Y-PARAM / ENTANGLE — design notes:
-    - Note "height" is a SINGLE value: it sets vel AND yVal together
-      (see ~"keep yVal in sync with vel drag"). So loudness and param
-      intensity are locked, not independent.
+  ACCENT MODE (built) — design notes:
+    - ACCENT button toggles the mode. In it: tap a note or swipe to paint
+      accents; drag a note vertically to set THAT note's accent value; tap the
+      track header to select the instrument and toggle the parameter picker;
+      double-tap the header to mute; label drag = volume (same as normal mode).
+    - vel (height) and yVal (accent) are now INDEPENDENT — velocity drag no
+      longer writes yVal. Unaccented notes render at fixed alpha; accented
+      notes use alpha to show accent value, plus diagonal hatch and dot.
+    - Delay send is binary (full level) on any accented note; the picked
+      parameter is what the accent value scales.
+    - TODO: numeric readout in the sliver above each bar while dragging.
+    - TODO: accent as hold/shift (or tap-to-latch + hold-for-momentary)
+      instead of a latching toggle — easy to forget to switch it back off.
+
+  VOICE ENVELOPES — note:
+    - Only the kick BODY ramps to true zero before its oscillator stops. The
+      punch, click and sub layers still stop on a non-zero exponential floor.
+      Harmless now the waveshaper DC bug is fixed, but if clicks ever return
+      on those layers, give them the same linearRampToValueAtTime(0, ...).
+
+  LEGACY (superseded by accent mode):
+    - Note "height" used to set vel AND yVal together, locking loudness to
+      param intensity.
     - This is intentional: entangle gives per-note customization without
       exploding the option count per note. Full independence per note would
       be too many controls and users would just set one value for all.
@@ -40,8 +59,6 @@
       (horizontal drag / two-finger) — only add if inverse cases are wanted.
     - Enable path (currently unintuitive): long-press instrument label ->
       Y-param picker -> pick param -> tap notes to entangle -> drag height.
-    - Add memory to enable / disable all, so accidental touch does not erase
-      all accents
 
   UX FRICTION to address:
     [ ] Record buttons may take too much horizontal real estate — review the
@@ -285,6 +302,10 @@ body{
 .tbn:active{transform:scale(0.93);}
 .tbn.active{background:var(--accent);color:#000;border-color:var(--accent);}
 .tbn.warn{border-color:var(--kick);position:relative;overflow:hidden;}
+#clrs-fill{
+  position:absolute;left:0;top:0;height:100%;width:0%;
+  background:var(--kick);opacity:0.25;pointer-events:none;transition:none;
+}
 #clr-fill{
   position:absolute;
   top:0;left:0;bottom:0;
@@ -691,11 +712,11 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   background:var(--s1);
   border:1px solid var(--border);
   border-radius:10px;
-  padding:18px;
-  width:min(340px,92vw);
+  padding:14px;
+  width:min(420px,94vw);
   display:flex;
   flex-direction:column;
-  gap:12px;
+  gap:9px;
   position:relative;
   overflow:hidden;
 }
@@ -703,12 +724,12 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
   font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;
 }
 #sample-box .sm-lengths{
-  display:flex;gap:6px;flex-wrap:wrap;
+  display:flex;gap:4px;flex-wrap:nowrap;
 }
 .sm-len{
   background:var(--s2);border:1px solid var(--border);
   color:var(--muted);font-family:'JetBrains Mono',monospace;
-  font-size:10px;padding:5px 10px;cursor:pointer;border-radius:3px;
+  font-size:10px;padding:5px 7px;white-space:nowrap;flex:1;text-align:center;cursor:pointer;border-radius:3px;
   transition:all 0.12s;
 }
 .sm-len.active{background:var(--s3);color:var(--accent);border-color:var(--accent);}
@@ -855,13 +876,13 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
       </select>
     </div>
     <button class="tbn" id="master-fx-btn">FX</button>
+    <button class="tbn" id="accent-btn">ACCENT</button>
     <div class="spacer"></div>
-    <button class="tbn warn" id="clear-btn">CLR<div id="clr-fill"></div></button>
     <button class="tbn active" id="play-btn">▶ PLAY</button>
     <div id="gear-wrap">
       <button class="tbn" id="gear-btn" title="Settings">⚙</button>
       <div id="gear-menu">
-        <div class="gear-item" id="glow-item">
+        <div class="gear-item" id="glow-item" style="display:none;">
           <span>Glow</span>
           <div class="gear-toggle active" id="glow-toggle"></div>
         </div>
@@ -877,7 +898,7 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
         <div class="gear-item" id="midi-offset-item" style="cursor:default;">
           <span>Sync offset</span>
           <div style="display:flex;align-items:center;gap:6px;">
-            <input type="range" id="midi-offset" min="0" max="250" step="1" value="0" style="width:70px;accent-color:var(--accent);cursor:pointer;">
+            <input type="range" id="midi-offset" min="0" max="150" step="1" value="0" style="width:70px;accent-color:var(--accent);cursor:pointer;">
             <span id="midi-offset-val" style="font-size:9px;color:var(--accent);min-width:34px;text-align:right;">0ms</span>
           </div>
         </div>
@@ -895,9 +916,15 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
           <span>Save preset…</span>
           <span style="font-size:10px;color:var(--muted);">＋</span>
         </div>
-        <div class="gear-item" id="clear-samples-item">
+        <div class="gear-item" id="clear-item" style="position:relative;overflow:hidden;">
+          <span>Clear pattern</span>
+          <span style="font-size:10px;color:var(--muted);">hold</span>
+          <div id="clr-fill"></div>
+        </div>
+        <div class="gear-item" id="clear-samples-item" style="position:relative;overflow:hidden;">
           <span>Clear samples</span>
-          <span style="font-size:10px;color:var(--muted);">⏺</span>
+          <span style="font-size:10px;color:var(--muted);">hold</span>
+          <div id="clrs-fill"></div>
         </div>
       </div>
     </div>
@@ -1135,6 +1162,32 @@ const masterGain = AC.createGain();
 masterGain.gain.value = 0.85;
 masterGain.connect(AC.destination);
 
+// Per-instrument choke bus: voices route through these so MONO mode can cut
+// the previous note's tail the instant a new note starts.
+const chokeGain = {};
+['kick','snare','hihat','tom'].forEach(_id => {
+  const _g = AC.createGain(); _g.gain.value = 1; _g.connect(masterGain); chokeGain[_id] = _g;
+});
+function chokeCut(id, t) {
+  // Give each new note its OWN bus, and permanently fade the previous one out.
+  // (Dipping a shared bus only makes a gap — the old tail resumes after.)
+  const prev = chokeGain[id];
+  if (prev) {
+    // ~14ms fade: short enough to read as a drum cut, long enough that a
+    // low-frequency tail isn't sliced mid-cycle (which is what clicks).
+    const a = Math.max(AC.currentTime, t - 0.014);
+    prev.gain.cancelScheduledValues(a);
+    prev.gain.setValueAtTime(prev.gain.value, a);
+    prev.gain.linearRampToValueAtTime(0, Math.max(a + 0.006, t));
+    const delay = Math.max(0, (t - AC.currentTime) * 1000) + 400;
+    setTimeout(() => { try { prev.disconnect(); } catch (e) {} }, delay);
+  }
+  const g = AC.createGain();
+  g.gain.value = 1;
+  g.connect(masterGain);
+  chokeGain[id] = g;   // voices read chokeGain[id] when they connect
+}
+
 function resumeAC() { if (AC.state === 'suspended') AC.resume(); }
 document.addEventListener('click', resumeAC);
 document.addEventListener('touchstart', resumeAC, { passive: true });
@@ -1278,7 +1331,9 @@ function buildMasterChain() {
 // Returns a GainNode connected to masterDelayNode that auto-disconnects after playDur
 function makeDelaySend(sendLevel, t, playDur) {
   const send = AC.createGain();
-  send.gain.value = sendLevel;
+  send.gain.value = 0;                       // closed until its note starts
+  send.gain.setValueAtTime(0, t);
+  send.gain.linearRampToValueAtTime(sendLevel, t + 0.003);
   send.connect(masterDelayNode);
   // Auto-disconnect after note ends to avoid node accumulation
   setTimeout(() => { try { send.disconnect(); } catch(e) {} },
@@ -1318,6 +1373,8 @@ let steps  = 16;
 let swing  = 0;
 let glowOn = true;
 let autoPlayOnPlace = true;  // play sound when a note is placed on the grid
+let accentMode = false;      // ACC button: paint accents instead of editing notes
+const accentLevel = { kick:0.8, snare:0.8, hihat:0.8, tom:0.8 };  // slider value in accent mode
 let isPlaying = false;
 let quantOn   = false;    // reserved for future quantise-to-grid feature
 
@@ -1413,11 +1470,18 @@ const SYNTH_DEFS = {
 // ═══════════════════════════════════════════════════════════════════
 
 // ── Distortion waveshaper factory ─────────────────────────────────
+const _distCache = new Map();
 function mkDist(k) {
   const ws = AC.createWaveShaper();
-  const n = 256, c = new Float32Array(n);
+  const key = Math.round(k * 100);
+  if (_distCache.has(key)) { ws.curve = _distCache.get(key); return ws; }
+  // n MUST be odd and x must span exactly -1..1: WebAudio maps input 0 to
+  // index (n-1)/2. With even n that lands between samples and interpolates to
+  // a non-zero value — the curve emits DC on silence, which clicks in and out
+  // with every note and does NOT scale with velocity.
+  const n = 4097, c = new Float32Array(n);
   for (let i = 0; i < n; i++) {
-    const x = i * 2 / n - 1;
+    const x = i * 2 / (n - 1) - 1;
     if (k <= 1.0) {
       // Soft saturation (0–1)
       const amt = k * 200;
@@ -1431,6 +1495,7 @@ function mkDist(k) {
       c[i] = soft * (1 - blend) + hard * blend;
     }
   }
+  _distCache.set(key, c);
   ws.curve = c;
   return ws;
 }
@@ -1442,27 +1507,31 @@ function playKick(t, vel = 1, overrides = {}) {
   const g = AC.createGain();
   const vol = vel * (0.55 + p.body * 0.45);
   g.gain.setValueAtTime(vol, t);
-  g.gain.exponentialRampToValueAtTime(0.001, t + p.decay);
+  g.gain.exponentialRampToValueAtTime(Math.max(1e-5, (vol) * 0.001), t + p.decay);
+  // Exponential ramps never reach 0; drive amplifies that residual ~20x, so
+  // stopping the osc on it clicks. Ramp to true zero first.
+  g.gain.linearRampToValueAtTime(0, t + p.decay + 0.02);
   const osc = AC.createOscillator();
   osc.type = 'sine';
   const startFreq = p.pitch + p.sweep * 22 * (0.5 + p.punch * 0.5);
   osc.frequency.setValueAtTime(startFreq, t);
   osc.frequency.exponentialRampToValueAtTime(p.pitch, t + 0.04 + p.sweep * 0.012);
+  osc.connect(g);
   if (p.drive > 0.01) {
     const dist = mkDist(p.drive);
-    osc.connect(dist); dist.connect(g);
+    g.connect(dist); dist.connect(chokeGain.kick);   // drive AFTER envelope
   } else {
-    osc.connect(g);
+    g.connect(chokeGain.kick);
   }
-  g.connect(masterGain);
-  osc.start(t); osc.stop(t + p.decay + 0.15);
+  osc.start(t); osc.stop(t + p.decay + 0.03);
   // Punch transient
   if (p.punch > 0.05) {
     const cg = AC.createGain();
-    cg.gain.setValueAtTime(vel * 0.25 * p.punch, t);
-    cg.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+    const pv = vel * 0.25 * p.punch;
+    cg.gain.setValueAtTime(pv, t);
+    cg.gain.exponentialRampToValueAtTime(Math.max(1e-5, pv * 0.001), t + 0.04);
     const ch = AC.createOscillator(); ch.type = 'sine'; ch.frequency.value = p.pitch * 1.5;
-    ch.connect(cg); cg.connect(masterGain); ch.start(t); ch.stop(t + 0.06);
+    ch.connect(cg); cg.connect(chokeGain.kick); ch.start(t); ch.stop(t + 0.06);
   }
   // Click layer — short noise burst for beater presence
   if (p.click > 0.02) {
@@ -1472,17 +1541,17 @@ function playKick(t, vel = 1, overrides = {}) {
     const csrc = AC.createBufferSource(); csrc.buffer = cbuf;
     const cg2 = AC.createGain();
     cg2.gain.setValueAtTime(vel * p.click * 0.6, t);
-    cg2.gain.exponentialRampToValueAtTime(0.001, t + 0.015);
+    cg2.gain.exponentialRampToValueAtTime(Math.max(1e-5, (vel * p.click * 0.6) * 0.001), t + 0.015);
     const chpf = AC.createBiquadFilter(); chpf.type = 'highpass'; chpf.frequency.value = 2000;
-    csrc.connect(chpf); chpf.connect(cg2); cg2.connect(masterGain); csrc.start(t);
+    csrc.connect(chpf); chpf.connect(cg2); cg2.connect(chokeGain.kick); csrc.start(t);
   }
   // Sub layer — octave below for low-end weight
   if (p.sub > 0.02) {
     const sg = AC.createGain();
     sg.gain.setValueAtTime(vel * p.sub * 0.5, t);
-    sg.gain.exponentialRampToValueAtTime(0.001, t + p.decay * 1.2);
+    sg.gain.exponentialRampToValueAtTime(Math.max(1e-5, (vel * p.sub * 0.5) * 0.001), t + p.decay * 1.2);
     const sosc = AC.createOscillator(); sosc.type = 'sine'; sosc.frequency.value = p.pitch * 0.5;
-    sosc.connect(sg); sg.connect(masterGain); sosc.start(t); sosc.stop(t + p.decay * 1.2 + 0.1);
+    sosc.connect(sg); sg.connect(chokeGain.kick); sosc.start(t); sosc.stop(t + p.decay * 1.2 + 0.1);
   }
 }
 
@@ -1491,30 +1560,30 @@ function playSnare(t, vel = 1, overrides = {}) {
   // Noise layer
   const gn = AC.createGain();
   gn.gain.setValueAtTime(vel * p.noise * 0.6, t);
-  gn.gain.exponentialRampToValueAtTime(0.001, t + p.decay);
+  gn.gain.exponentialRampToValueAtTime(Math.max(1e-5, (vel * p.noise * 0.6) * 0.001), t + p.decay);
   const buf = AC.createBuffer(1, Math.ceil(AC.sampleRate * 0.6), AC.sampleRate);
   const d = buf.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   const ns = AC.createBufferSource(); ns.buffer = buf;
   const hpf = AC.createBiquadFilter(); hpf.type = 'highpass'; hpf.frequency.value = p.pitch * 0.9;
-  ns.connect(hpf); hpf.connect(gn); gn.connect(masterGain); ns.start(t);
+  ns.connect(hpf); hpf.connect(gn); gn.connect(chokeGain.snare); ns.start(t);
   // Tone layer with pitch drop (tune)
   const gt = AC.createGain();
   gt.gain.setValueAtTime(vel * p.tone * 0.55, t);
-  gt.gain.exponentialRampToValueAtTime(0.001, t + p.decay * 0.6);
+  gt.gain.exponentialRampToValueAtTime(Math.max(1e-5, (vel * p.tone * 0.55) * 0.001), t + p.decay * 0.6);
   const osc = AC.createOscillator();
   osc.type = 'triangle';
   osc.frequency.setValueAtTime(p.pitch * (1 + p.tune * 0.5), t);
   osc.frequency.exponentialRampToValueAtTime(p.pitch, t + 0.03 + p.tune * 0.06);
-  osc.connect(gt); gt.connect(masterGain);
+  osc.connect(gt); gt.connect(chokeGain.snare);
   osc.start(t); osc.stop(t + p.decay);
   // Snap transient
   if (p.snap > 0.05) {
     const gs = AC.createGain();
     gs.gain.setValueAtTime(vel * p.snap * 0.4, t);
-    gs.gain.exponentialRampToValueAtTime(0.001, t + 0.025);
+    gs.gain.exponentialRampToValueAtTime(Math.max(1e-5, (vel * p.snap * 0.4) * 0.001), t + 0.025);
     const os2 = AC.createOscillator(); os2.type = 'square'; os2.frequency.value = p.pitch * 2.2;
-    os2.connect(gs); gs.connect(masterGain); os2.start(t); os2.stop(t + 0.03);
+    os2.connect(gs); gs.connect(chokeGain.snare); os2.start(t); os2.stop(t + 0.03);
   }
   // Crack — short high-pitched noise burst, rimshot-like attack
   if (p.crack > 0.02) {
@@ -1524,9 +1593,9 @@ function playSnare(t, vel = 1, overrides = {}) {
     const csrc = AC.createBufferSource(); csrc.buffer = cbuf;
     const cg = AC.createGain();
     cg.gain.setValueAtTime(vel * p.crack * 0.7, t);
-    cg.gain.exponentialRampToValueAtTime(0.001, t + 0.012);
+    cg.gain.exponentialRampToValueAtTime(Math.max(1e-5, (vel * p.crack * 0.7) * 0.001), t + 0.012);
     const cbpf = AC.createBiquadFilter(); cbpf.type = 'bandpass'; cbpf.frequency.value = p.pitch * 3; cbpf.Q.value = 2;
-    csrc.connect(cbpf); cbpf.connect(cg); cg.connect(masterGain); csrc.start(t);
+    csrc.connect(cbpf); cbpf.connect(cg); cg.connect(chokeGain.snare); csrc.start(t);
   }
 }
 
@@ -1537,22 +1606,22 @@ function playHihat(t, vel = 1, open = false, overrides = {}) {
   const g = AC.createGain();
   g.gain.setValueAtTime(atk > 0.002 ? 0.001 : vel * (0.28 + p.tone * 0.2), t);
   g.gain.linearRampToValueAtTime(vel * (0.28 + p.tone * 0.2), t + atk);
-  g.gain.exponentialRampToValueAtTime(0.001, t + atk + dec);
+  g.gain.exponentialRampToValueAtTime(Math.max(1e-5, (atk > 0.002 ? 0.001 : vel * (0.28 + p.tone * 0.2)) * 0.001), t + atk + dec);
   const buf = AC.createBuffer(1, Math.ceil(AC.sampleRate * Math.max(dec + atk + 0.05, 0.3)), AC.sampleRate);
   const dd = buf.getChannelData(0);
   for (let i = 0; i < dd.length; i++) dd[i] = Math.random() * 2 - 1;
   const ns = AC.createBufferSource(); ns.buffer = buf;
   const hpf = AC.createBiquadFilter(); hpf.type = 'highpass'; hpf.frequency.value = p.pitch * (0.3 + (p.hpf || 0.65) * 0.7);
   const bpf = AC.createBiquadFilter(); bpf.type = 'bandpass'; bpf.frequency.value = p.pitch; bpf.Q.value = 0.5 + p.metal * 3;
-  ns.connect(hpf); hpf.connect(bpf); bpf.connect(g); g.connect(masterGain); ns.start(t);
+  ns.connect(hpf); hpf.connect(bpf); bpf.connect(g); g.connect(chokeGain.hihat); ns.start(t);
   if (p.metal > 0.1) {
     const mg = AC.createGain();
     mg.gain.setValueAtTime(0.001, t);
     mg.gain.linearRampToValueAtTime(vel * p.metal * 0.12, t + atk);
-    mg.gain.exponentialRampToValueAtTime(0.001, t + atk + dec * 0.6);
+    mg.gain.exponentialRampToValueAtTime(Math.max(1e-5, (0.001) * 0.001), t + atk + dec * 0.6);
     const osc1 = AC.createOscillator(); osc1.type = 'square'; osc1.frequency.value = p.pitch * 1.414;
     const osc2 = AC.createOscillator(); osc2.type = 'square'; osc2.frequency.value = p.pitch * 1.732;
-    osc1.connect(mg); osc2.connect(mg); mg.connect(masterGain);
+    osc1.connect(mg); osc2.connect(mg); mg.connect(chokeGain.hihat);
     osc1.start(t); osc1.stop(t + atk + dec + 0.02);
     osc2.start(t); osc2.stop(t + atk + dec + 0.02);
   }
@@ -1564,7 +1633,7 @@ function playTom(t, vel = 1, overrides = {}) {
   const g = AC.createGain();
   g.gain.setValueAtTime(atk > 0.001 ? 0.001 : vel * (0.45 + p.body * 0.55), t);
   g.gain.linearRampToValueAtTime(vel * (0.45 + p.body * 0.55), t + atk);
-  g.gain.exponentialRampToValueAtTime(0.001, t + atk + p.decay);
+  g.gain.exponentialRampToValueAtTime(Math.max(1e-5, (atk > 0.001 ? 0.001 : vel * (0.45 + p.body * 0.55)) * 0.001), t + atk + p.decay);
   const osc = AC.createOscillator();
   osc.type = 'sine';
   osc.frequency.setValueAtTime(p.pitch + p.sweep * 16, t);
@@ -1575,7 +1644,7 @@ function playTom(t, vel = 1, overrides = {}) {
   } else {
     osc.connect(g);
   }
-  g.connect(masterGain);
+  g.connect(chokeGain.tom);
   osc.start(t); osc.stop(t + atk + p.decay + 0.1);
 }
 
@@ -1777,7 +1846,7 @@ function playSample(id, t, vel, dur, overrides = {}) {
     g.gain.linearRampToValueAtTime(0, t + playDur);
   }
 
-  const dest = instFX[id] ? instFX[id].input : masterGain;
+  const dest = instFX[id] ? instFX[id].input : (chokeGain[id] || masterGain);
   src.connect(g); g.connect(dest);
 
   if (overrides.delaySend > 0 && masterDelayNode) {
@@ -1792,6 +1861,7 @@ function playSample(id, t, vel, dur, overrides = {}) {
 // Single entry point: routes to sample or synth voice, applies mute + vol.
 function triggerInst(id, t, vel, dur, overrides = {}) {
   if (muted[id]) return;
+  if (instChoke[id]) chokeCut(id, t);   // MONO: cut previous tail
   if (instSamples[id]) { playSample(id, t, vel, dur, overrides); return; }  const v = velCurve(vel) * (instVol[id] ?? 1);
   if (id === 'kick')  playKick(t, v, overrides);
   else if (id === 'snare') playSnare(t, v, overrides);
@@ -1811,9 +1881,16 @@ function triggerInst(id, t, vel, dur, overrides = {}) {
     // Simplest: just connect masterGain → send for a very short window.
     // Use a timed gain that opens on the beat and closes quickly.
     const tap = AC.createGain();
-    tap.gain.setValueAtTime(sendVol, t);
-    tap.gain.setValueAtTime(0, t + Math.min(playDur, 0.3));
-    masterGain.connect(tap);
+    // Default gain is 1 and this node is built during lookahead, so it would sit
+    // wide open before t. Start closed, and ramp instead of stepping — instant
+    // gain steps on a live signal are clicks, and the delay recirculates them.
+    tap.gain.value = 0;
+    tap.gain.setValueAtTime(0, t);
+    tap.gain.linearRampToValueAtTime(sendVol, t + 0.003);
+    const tapEnd = t + Math.min(playDur, 0.3);
+    tap.gain.setValueAtTime(sendVol, Math.max(t + 0.004, tapEnd - 0.008));
+    tap.gain.linearRampToValueAtTime(0, tapEnd);
+    (chokeGain[id] || masterGain).connect(tap);   // per-instrument tap (was masterGain = bled all tracks)
     tap.connect(masterDelayNode);
     setTimeout(() => { try { masterGain.disconnect(tap); tap.disconnect(); send.disconnect(); } catch(e) {} },
       (t - AC.currentTime + playDur + 0.5) * 1000);
@@ -1841,11 +1918,12 @@ function scheduleStep(step, t) {
         const swingOff = (step % 2 === 1) ? swing * stepDur() : 0;
         const override = {};
         const yp = instYParam[inst.id];
-        if (n.entangled && yp && yp !== 'none' && yp !== null) {
-          if (yp === 'delaySend') {
-            // Route into shared delay at Y-value amount — unarmed notes get 0 (bypass)
-            override.delaySend = n.yVal ?? n.vel;
-          } else {
+        if (n.entangled) {
+          // An accented note gets BOTH the delay send and the selected param.
+          // Delay is ON/OFF — its character is set in the FX tab, so send at
+          // full level rather than scaling it by the accent intensity.
+          override.delaySend = 1;
+          if (yp && yp !== 'none' && yp !== 'delaySend') {
             const range = instYParamRange[inst.id] || { min:0, max:1 };
             override[yp] = range.min + (n.yVal ?? n.vel) * (range.max - range.min);
           }
@@ -1876,6 +1954,7 @@ function startSeq() {
   nextStepTime = seqStartTime;
   scheduler();
   visualRaf = requestAnimationFrame(visualTick);
+  restoreDelay();     // reopen the delay muted by the previous stop
   startMidiClock();   // MIDI SYNC: Start + clock to Minilogue
 }
 
@@ -1886,6 +1965,7 @@ function stopSeq() {
   visualRaf = null;
   lastRenderedStep = -1;
   renderAll();
+  flushDelay();       // don't leave delay tails ringing after stop
   stopMidiClock();    // MIDI SYNC: Stop
 }
 
@@ -1996,7 +2076,11 @@ function renderBand(instId) {
     cx.fillRect(x, 0, durW + 2, h);
 
     // Body
-    cx.globalAlpha = isPreviewNote ? 0.25 : (0.18 + n.vel * 0.82);
+    // Accented notes encode their accent value as alpha across the full range.
+    const accV = Math.max(0, Math.min(1, n.yVal ?? n.vel));
+    cx.globalAlpha = isPreviewNote ? 0.25
+      : n.entangled ? (0.18 + accV * 0.82)
+      : 0.72;   // unaccented: fixed — height alone carries velocity
     cx.fillStyle = col;
     if (cx.roundRect) {
       cx.beginPath(); cx.roundRect(x + 1.5, ny, durW - 2, nh, 3); cx.fill();
@@ -2030,7 +2114,7 @@ function renderBand(instId) {
     }
 
     // Diagonal hatch for entangled notes
-    if (n.entangled && instYParam[instId]) {
+    if (n.entangled) {
       cx.save();
       cx.beginPath();
       if (cx.roundRect) cx.roundRect(x + 1.5, ny, durW - 2, nh, 3);
@@ -2060,7 +2144,7 @@ function renderBand(instId) {
     cx.globalAlpha = 1;
 
     // Velocity dot — show yVal position if entangled
-    const dotY = n.entangled && instYParam[instId]
+    const dotY = n.entangled
       ? ny + nh * (1 - (n.yVal ?? n.vel))
       : ny + 6;
     cx.globalAlpha = 0.85;
@@ -2271,6 +2355,26 @@ function setupBandEvents(instId, canvas) {
     resumeAC();
     const { x, y } = getXY(e);
     const ds = drawSt[instId];
+
+    // Accent mode: paint accents only. No placing, resizing or volume drag.
+    if (accentMode) {
+      ds.active = true;
+      ds.mode = 'accent';
+      const h = noteHitTest(x);
+      ds.startY = y;
+      ds.accentNote = h ? h.note : null;
+      ds.accentDragging = false;
+      ds.accentSet = h ? !h.note.entangled : true;
+      if (h) {
+        h.note.entangled = ds.accentSet;
+        // Remember the note's own value; only seed from the track level if it
+        // has never been accented before.
+        if (ds.accentSet && h.note.yVal === undefined) h.note.yVal = accentLevel[instId];
+        renderBand(instId);
+      }
+      return;
+    }
+
     ds.active = true;
     ds.startX = x; ds.startY = y;
     ds.t0 = Date.now();
@@ -2302,6 +2406,7 @@ function setupBandEvents(instId, canvas) {
     } else {
       ds.startStep = xToStep(x);
     }
+    ds.drawPlayed = false;
     renderBand(instId);
   }
 
@@ -2310,6 +2415,25 @@ function setupBandEvents(instId, canvas) {
     const ds = drawSt[instId];
     if (!ds.active) return;
     const { x, y } = getXY(e);
+
+    // Accent mode: swipe paints every note the finger crosses.
+    if (ds.mode === 'accent') {
+      // Vertical drag on the note you started on = set that note's accent value
+      if (ds.accentNote && Math.abs(y - ds.startY) > 6) {
+        ds.accentDragging = true;
+        ds.accentNote.yVal = yToVel(y);
+        ds.accentNote.entangled = true;
+        renderBand(instId);
+        return;
+      }
+      const h = noteHitTest(x);
+      if (h && h.note.entangled !== ds.accentSet) {
+        h.note.entangled = ds.accentSet;
+        if (ds.accentSet && h.note.yVal === undefined) h.note.yVal = accentLevel[instId];
+        renderBand(instId);
+      }
+      return;
+    }
 
     if (ds.mode === 'pending-hit') {
       const dx = Math.abs(x - ds.startX);
@@ -2323,8 +2447,7 @@ function setupBandEvents(instId, canvas) {
       const PX_PER_UNIT = 120;
       const deltaVel = (ds.velDragStartY - y) / PX_PER_UNIT;
       const newVel = Math.max(0.05, Math.min(1.0, ds.velDragStartVel + deltaVel));
-      ds.hitNote.vel = newVel;
-      ds.hitNote.yVal = newVel; // keep yVal in sync with vel drag
+      ds.hitNote.vel = newVel;   // yVal (accent) is independent — do not touch
       renderBand(instId); return;
     }
 
@@ -2363,11 +2486,25 @@ function setupBandEvents(instId, canvas) {
         { step: sStep, vel, dur, yVal: vel }
       ];
       ds.drawNote = notes[instId][notes[instId].length - 1];
+      if (!ds.drawPlayed && autoPlayOnPlace) {   // play once when the note first appears
+        ds.drawPlayed = true;
+        resumeAC();
+        triggerInst(instId, AC.currentTime + 0.01, vel, dur);
+      }
       renderBand(instId);
     }
   }
 
   function onUp(e) {
+    if (drawSt[instId].mode === 'accent') {
+      const _ds = drawSt[instId];
+      if (_ds.accentDragging && _ds.accentNote) {
+        resumeAC();
+        triggerInst(instId, AC.currentTime + 0.01, _ds.accentNote.vel, _ds.accentNote.dur);
+      }
+      _ds.active = false; _ds.accentDragging = false; _ds.accentNote = null;
+      return;
+    }
     const ds = drawSt[instId];
     if (!ds.active) return;
     const held = Date.now() - ds.t0;
@@ -2434,6 +2571,7 @@ function setupBandEvents(instId, canvas) {
   function handleDoubleTap(x) {
     const hit = noteHitTest(x);
     if (hit) {
+      if (accentMode) return;   // accent mode never edits note existence
       notes[instId] = (notes[instId] || []).filter(n => n !== hit.note);
       renderBand(instId); return true;
     }
@@ -2483,6 +2621,23 @@ const instYParamRange = { kick:{min:0,max:1}, snare:{min:0,max:1}, hihat:{min:0,
 const instEntangleSaved = { kick:null, snare:null, hihat:null, tom:null };
 
 // ── Volume fill helper ─────────────────────────────────────────────
+// Shared mute toggle (used by double-tap in both normal and accent mode)
+let premuteVolShared = 0.9;
+function toggleMute(instId, lbl) {
+  if (muted[instId]) {
+    muted[instId] = false;
+    instVol[instId] = premuteVolShared || 0.9;
+    if (lbl) lbl.classList.remove('muted-swipe');
+  } else {
+    premuteVolShared = instVol[instId];
+    muted[instId] = true;
+    instVol[instId] = 0;
+    if (lbl) lbl.classList.add('muted-swipe');
+  }
+  updateVolFill(instId);
+  renderBand(instId);
+}
+
 function updateVolFill(instId) {
   const fill = document.getElementById('volfill-' + instId);
   if (fill) fill.style.height = (instVol[instId] * 100) + '%';
@@ -2494,9 +2649,9 @@ function showYParamPicker(instId, anchorEl) {
   const current = instYParam[instId];
   const inst = INSTRUMENTS.find(i => i.id === instId);
 
-  picker.innerHTML = `<div class="yparam-label" style="color:${inst.color}">Y → ${inst.name}</div>` +
-    `<div class="yparam-opt${current === 'none' ? ' active' : ''}" data-key="none">— None —</div>` +
-    `<div class="yparam-opt${current === 'delaySend' ? ' active' : ''}" data-key="delaySend" data-min="0" data-max="1" style="color:#ffe040">⟳ Delay send</div>` +
+  picker.dataset.inst = instId;
+  picker.innerHTML =
+    `<div class="yparam-opt${current === 'delaySend' ? ' active' : ''}" data-key="delaySend" data-min="0" data-max="1">Delay send</div>` +
     defs.map(d => `<div class="yparam-opt${current === d.k ? ' active' : ''}" data-key="${d.k}" data-min="${d.min}" data-max="${d.max}">${d.l}</div>`).join('');
 
   // Position: to the right of anchor, clamped to screen
@@ -2547,7 +2702,12 @@ function updateMuteBtn(instId) {
 // Close picker on outside tap
 document.addEventListener('pointerdown', (e) => {
   const picker = document.getElementById('yparam-picker');
-  if (!picker.contains(e.target)) picker.classList.remove('visible');
+  if (!picker.contains(e.target)) {
+    // Remember state for this gesture so a tap on the same label can toggle
+    // rather than always re-opening.
+    picker.dataset.wasOpen = picker.classList.contains('visible') ? '1' : '0';
+    picker.classList.remove('visible');
+  }
 }, true);
 
 // ── Band DOM builder ───────────────────────────────────────────────
@@ -2628,19 +2788,12 @@ function buildBands() {
       didHold = false;
       isDragging = false;
       isDown = true;
-      holdTimer = setTimeout(() => {
-        didHold = true;
-        holdTimer = null;
-        if (instArmed[inst.id]) {
-          // Exit edit mode only — keep instYParam + note accents intact.
-          instArmed[inst.id] = false;
-          document.getElementById('yparam-picker').classList.remove('visible');
-          updateMuteBtn(inst.id);
-          renderBand(inst.id);
-        } else {
-          showYParamPicker(inst.id, lbl);
-        }
-      }, 400);
+      if (accentMode) {   // volume drag identical to normal mode; tap opens picker
+        volStartVal = instVol[inst.id];
+        lbl.setPointerCapture(e.pointerId);
+        return;
+      }
+      // Long-press no longer opens the Y-param picker — that lives in ACC mode.
       lbl.setPointerCapture(e.pointerId);
     });
 
@@ -2657,11 +2810,14 @@ function buildBands() {
         // 1:1 with pointer: 150px of drag = full range (0→1)
         const PX_PER_UNIT = 150;
         const newVol = Math.max(0, Math.min(1, volStartVal - dy / PX_PER_UNIT));
+
         instVol[inst.id] = newVol;
         updateVolFill(inst.id);
-        // Mute indicator: if dragged to 0, mark as muted
+        // Mute indicator: match the double-tap mute visuals exactly
+        const wasMuted = muted[inst.id];
         muted[inst.id] = newVol === 0;
         lbl.classList.toggle('muted-swipe', muted[inst.id]);
+        if (wasMuted !== muted[inst.id]) { updateMuteBtn(inst.id); renderBand(inst.id); }
       }
     });
 
@@ -2670,12 +2826,35 @@ function buildBands() {
 
     lbl.addEventListener('pointerup', (e) => {
       if (e.target === recBtn) return;
-      if (holdTimer !== null) {
-        clearTimeout(holdTimer); holdTimer = null;
+      if (accentMode) {
+        if (!isDragging) {
+          // tap toggles the picker; double-tap still mutes
+          const now = Date.now();
+          if (now - lastLblTap < 320) {
+            lastLblTap = 0;
+            document.getElementById('yparam-picker').classList.remove('visible');
+            toggleMute(inst.id, lbl);
+          } else {
+            lastLblTap = now;
+            selectInst(inst.id);
+            const pk = document.getElementById('yparam-picker');
+            if (pk.dataset.wasOpen === '1' && pk.dataset.inst === inst.id) {
+              pk.classList.remove('visible');   // same label tapped again → close
+            } else {
+              showYParamPicker(inst.id, lbl);
+            }
+          }
+        }
+        isDown = false; isDragging = false;
+        return;
+      }
+      {
+        if (holdTimer !== null) { clearTimeout(holdTimer); holdTimer = null; }
         if (!isDragging) {
           const now = Date.now();
           const isDoubleTap = (now - lastLblTap) < 320;
           lastLblTap = isDoubleTap ? 0 : now; // reset so triple-tap doesn't re-trigger
+          if (!isDoubleTap) selectInst(inst.id);
 
           if (isDoubleTap) {
             // Double tap — toggle mute
@@ -2757,6 +2936,8 @@ function selectInst(id) {
 // NOTE: PRESETS lives here (next to its consumer renderSynthPanel) but
 // logically belongs to SYNTH DATA. Move to synth-data.js on split.
 let autoTest = false;
+const instChoke = { kick:false, snare:false, hihat:false, tom:false }; // mono/choke per track
+const activeVoices = {};   // instId -> {gain, stopAt} of the currently ringing voice
 let autoTestTimer = null;
 
 const PRESETS = {
@@ -2837,7 +3018,7 @@ function renderSynthPanel() {
       </div>
       <div style="display:flex;flex-direction:row;gap:4px;flex-shrink:0;">
         <button class="prev-btn ${autoTest ? 'auto-active' : ''}" id="autotest-btn">⟳ AUTO</button>
-        <button class="prev-btn" id="preview-btn">▶ TEST</button>
+        <button class="prev-btn ${instChoke[inst.id] ? 'auto-active' : ''}" id="choke-btn">MONO</button>
       </div>
     </div>
     <div class="synth-row">
@@ -2883,9 +3064,9 @@ function renderSynthPanel() {
     document.getElementById('autotest-btn').classList.toggle('auto-active', autoTest);
   });
 
-  document.getElementById('preview-btn').addEventListener('click', () => {
-    resumeAC();
-    triggerInst(selectedInst, AC.currentTime + 0.01, 0.82, 1);
+  document.getElementById('choke-btn').addEventListener('click', () => {
+    instChoke[inst.id] = !instChoke[inst.id];
+    document.getElementById('choke-btn').classList.toggle('auto-active', instChoke[inst.id]);
   });
 }
 
@@ -3910,6 +4091,12 @@ document.addEventListener('pointerdown', (e) => {
 }, true);
 
 // Glow toggle inside gear menu
+document.getElementById('accent-btn').addEventListener('click', () => {
+  accentMode = !accentMode;
+  document.getElementById('accent-btn').classList.toggle('active', accentMode);
+  renderAll();
+});
+
 document.getElementById('glow-item').addEventListener('click', () => {
   glowOn = !glowOn;
   document.getElementById('glow-toggle').classList.toggle('active', glowOn);
@@ -3994,6 +4181,31 @@ function clockDriver() {
   }
   clockTimer = setTimeout(clockDriver, 4);   // tight poll against the audio clock
 }
+// Mute the delay and KEEP it muted — the delay line still holds audio, so
+// restoring wet too early just lets the old tail back through. Reopened by
+// restoreDelay() when playback starts again.
+function flushDelay(fade = 0.06) {
+  if (!masterDelayFeedback || !masterDelayWet) return;
+  const now = AC.currentTime;
+  [masterDelayFeedback.gain, masterDelayWet.gain].forEach(prm => {
+    prm.cancelScheduledValues(now);
+    prm.setValueAtTime(prm.value, now);
+    prm.linearRampToValueAtTime(0, now + fade);
+  });
+}
+
+function restoreDelay() {
+  if (!masterDelayFeedback || !masterDelayWet) return;
+  const now = AC.currentTime;
+  const pairs = [[masterDelayFeedback.gain, masterFXP.delayFeedback],
+                 [masterDelayWet.gain,      masterFXP.delayMix]];
+  pairs.forEach(([prm, target]) => {
+    prm.cancelScheduledValues(now);
+    prm.setValueAtTime(prm.value, now);
+    prm.linearRampToValueAtTime(target, now + 0.02);
+  });
+}
+
 function stopMidiClock() {
   clearTimeout(clockTimer);
   clockTimer = null;
@@ -4034,7 +4246,7 @@ document.getElementById('play-btn').addEventListener('click', function () {
 });
 
 // ── CLR hold-to-clear button ───────────────────────────────────────
-const clrBtn  = document.getElementById('clear-btn');
+const clrBtn  = document.getElementById('clear-item');
 const clrFill = document.getElementById('clr-fill');
 const CLR_HOLD_MS = 1000;
 let clrRAF = null;
@@ -4248,18 +4460,34 @@ document.getElementById('save-preset-item').addEventListener('click', () => {
   saveUserPreset();
 });
 
-document.getElementById('clear-samples-item').addEventListener('click', () => {
-  INSTRUMENTS.forEach(inst => {
-    instSamples[inst.id] = null;
-    instSamplesRev[inst.id] = null;
-    teardownFXChain(inst.id);
-    const btn = document.getElementById('rec-' + inst.id);
-    if (btn) btn.classList.remove('sampled');
+// Clear samples — hold to confirm, same as Clear pattern
+(() => {
+  const btn  = document.getElementById('clear-samples-item');
+  const fill = document.getElementById('clrs-fill');
+  let raf = null, start = 0;
+  const cancel = () => { cancelAnimationFrame(raf); raf = null; fill.style.width = '0%'; };
+  btn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    btn.setPointerCapture(e.pointerId);
+    start = performance.now();
+    function tick(now) {
+      const p = Math.min(1, (now - start) / CLR_HOLD_MS);
+      fill.style.width = (p * 100) + '%';
+      if (p < 1) { raf = requestAnimationFrame(tick); return; }
+      INSTRUMENTS.forEach(inst => {
+        instSamples[inst.id] = null;
+        instSamplesRev[inst.id] = null;
+        teardownFXChain(inst.id);
+        const b = document.getElementById('rec-' + inst.id);
+        if (b) b.classList.remove('sampled');
+      });
+      renderSynthPanel();
+      setTimeout(cancel, 180);
+    }
+    raf = requestAnimationFrame(tick);
   });
-  gearMenu.classList.remove('open');
-  gearBtn.classList.remove('active');
-  renderSynthPanel();
-});
+  ['pointerup','pointercancel','pointerleave'].forEach(ev => btn.addEventListener(ev, cancel));
+})();
 
 // ── Master FX modal ───────────────────────────────────────────────
 function openMasterFX() {
