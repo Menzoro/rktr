@@ -37,9 +37,52 @@
       notes use alpha to show accent value, plus diagonal hatch and dot.
     - Delay send is binary (full level) on any accented note; the picked
       parameter is what the accent value scales.
+    - Normal mode: tapping a note toggles its FX on/off (binary). Accent mode
+      is now ONLY for editing the accent VALUE — it has become very thin, and
+      may not justify being a mode at all.
+    - TODO: decide accent mode's fate. Competing ideas, none chosen:
+        (a) hold/shift momentary instead of latching (easy to forget to
+            switch off)
+        (b) drop the mode entirely and set values another way
+        (c) keep as is
+        (d) LINK velocity and the parameter by default, so height drives both
+            (the classic accent behaviour — see LEGACY below, which we moved
+            away from) while keeping them separable when needed
+        (e) drag a note upward from its bottom edge to set the RATIO of
+            velocity-to-parameter, instead of an absolute accent value
+    - BUG (deferred): painting in accent mode is inconsistent — the note the
+      gesture STARTS on follows the finger's Y, while notes swiped across are
+      only toggled with no value set. Goes away if painting becomes binary.
     - TODO: numeric readout in the sliver above each bar while dragging.
-    - TODO: accent as hold/shift (or tap-to-latch + hold-for-momentary)
-      instead of a latching toggle — easy to forget to switch it back off.
+    - TODO: velocity currently only sets level. Consider feeding it into the
+      engines (harder = brighter/crackier) so normal playing feels expressive
+      without needing accents. This is what makes velocity worth more than a
+      per-note volume fader.
+
+  FX ARCHITECTURE — decision pending:
+    - Delay is currently a per-note SEND whose character is set in Master FX.
+      That is the right design for drums (a master delay makes the kit soup);
+      Elektron does the same with per-track sends.
+    - Proposal discussed: a second tab in the FX modal for PER-NOTE fx, so each
+      accented note picks one send (delay/reverb) + one insert (bitcrush/ring
+      mod), alongside its one synth parameter.
+        · sends = parallel, one shared bus, cheap (delay already works this way)
+        · inserts = in series inside that note's chain, needs a routing helper
+      Blocked on: if delay moves to the per-note tab it leaves a gap in Master
+      FX, and the 2x2 grid + BYRG colour identity (Blue/Yellow/Red/Green =
+      4 tracks AND 4 FX units) means master must keep four units.
+    - Ring mod chosen over sample-rate reduction (bitcrush's sibling) as the
+      more distinctive 4th effect.
+
+  BASSLINE / NOTE PARAM (built):
+    - 'Note' Y-param on kick + tom: snaps accent value to semitones, one octave
+      above the track's Pitch (root). Tom forces sweep to 0 so it sounds at its
+      true frequency; kick keeps sweep so it still reads as a kick.
+    - Tom pitch is in Hz (35-200, roughly C1-G3) but shows no unit because
+      fmtParam only appends 'hz' above 1000.
+    - TODO if pursued: note-name readout next to the Hz value so a root can be
+      dialled by eye instead of by ear. Full piano-roll UI is a much bigger
+      build — park behind play mode.
 
   VOICE ENVELOPES — note:
     - Only the kick BODY ramps to true zero before its oscillator stops. The
@@ -1035,12 +1078,12 @@ canvas.band-cv{display:block;width:100%;height:100%;touch-action:none;}
               <div class="fx-param-row">
                 <label>Time</label>
                 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;flex:1;">
-                  <button class="fx-time-btn" data-time="1/16">1/16</button>
+                  <button class="fx-time-btn" data-time="1/32">1/32</button>
                   <button class="fx-time-btn" data-time="1/8">1/8</button>
                   <button class="fx-time-btn" data-time="1/4">1/4</button>
                   <button class="fx-time-btn" data-time="d1/8">d1/8</button>
                   <button class="fx-time-btn" data-time="3/8">3/8</button>
-                  <button class="fx-time-btn" data-time="1/2">1/2</button>
+                  <button class="fx-time-btn" data-time="1/16">1/16</button>
                 </div>
               </div>
             </div>
@@ -1224,7 +1267,7 @@ function unduckMaster() {
 // masterGain no longer connects directly to destination — chain does.
 
 const masterFXP = {
-  delayTime:     '1/4',
+  delayTime:     '1/8',
   delayFeedback: 0.35,
   delayMix:      0.4,
   reverbWet:     0,      // off by default — no FX on load
@@ -1246,8 +1289,8 @@ const MASTER_COMP_PRESETS = {
 };
 
 // Delay time options — steps of 1/16 note each
-// 2 rows × 3 cols: 1/16, 1/8, 1/4 / dotted-1/8, 3/8, 1/2
-const DELAY_TIMES = { '1/16':1, '1/8':2, '1/4':4, 'd1/8':3, '3/8':6, '1/2':8 };
+// 2 rows × 3 cols: 1/32, 1/16, 1/8 / 1/4, dotted-1/8, 3/8
+const DELAY_TIMES = { '1/32':0.5, '1/16':1, '1/8':2, '1/4':4, 'd1/8':3, '3/8':6 };
 
 // Nodes — built at init, referenced globally
 let masterComp, masterDelayNode, masterDelayFeedback, masterDelayWet,
@@ -1283,7 +1326,7 @@ function buildMasterChain() {
   masterDelayWet      = AC.createGain();
   masterDelayDry      = AC.createGain();
   // Delay time set lazily — stepDur() is valid here since bpm is already set
-  masterDelayNode.delayTime.value = (DELAY_TIMES[masterFXP.delayTime] || 4) * stepDur();
+  masterDelayNode.delayTime.value = (DELAY_TIMES[masterFXP.delayTime] || 2) * stepDur();
   masterDelayFeedback.gain.value  = masterFXP.delayFeedback;
   masterDelayWet.gain.value       = masterFXP.delayMix;
   masterDelayDry.gain.value       = 1;
@@ -1356,7 +1399,7 @@ function applyMasterFX() {
   masterEqHigh.gain.setTargetAtTime(masterFXP.eqHigh, AC.currentTime, 0.01);
   // Volume: allow true zero (mute)
   masterOut.gain.setTargetAtTime(Math.max(0, masterFXP.volume), AC.currentTime, 0.01);
-  const steps16 = DELAY_TIMES[masterFXP.delayTime] || 4;
+  const steps16 = DELAY_TIMES[masterFXP.delayTime] || 2;
   masterDelayNode.delayTime.setTargetAtTime(steps16 * stepDur(), AC.currentTime, 0.01);
   masterDelayFeedback.gain.setTargetAtTime(masterFXP.delayFeedback, AC.currentTime, 0.01);
   masterDelayWet.gain.setTargetAtTime(masterFXP.delayMix, AC.currentTime, 0.01);
@@ -1374,6 +1417,7 @@ let swing  = 0;
 let glowOn = true;
 let autoPlayOnPlace = true;  // play sound when a note is placed on the grid
 let accentMode = false;      // ACC button: paint accents instead of editing notes
+let lastAccentTapNote = null, lastAccentTapTime = 0;  // double-tap-to-flush tracking
 const accentLevel = { kick:0.8, snare:0.8, hihat:0.8, tom:0.8 };  // slider value in accent mode
 let isPlaying = false;
 let quantOn   = false;    // reserved for future quantise-to-grid feature
@@ -1447,7 +1491,7 @@ const SYNTH_DEFS = {
     { k:'pitch',   l:'Freq',    min:2000, max:16000, step:100  },
     { k:'hpf',     l:'HPF',     min:0.1,  max:1.0,   step:0.01 },
     { k:'attack',  l:'Attack',  min:0,    max:0.05,  step:0.001},
-    { k:'opendec', l:'Decay',   min:0.1,  max:3.0,   step:0.1,  fmt:'1s' },
+    { k:'opendec', l:'Decay',   min:0.1,  max:3.0,   step:0.01 },
     { k:'metal',   l:'Metal',   min:0,    max:1,     step:0.01 },
     { k:'tone',    l:'Tone',    min:0,    max:1,     step:0.01 },
   ],
@@ -1922,8 +1966,16 @@ function scheduleStep(step, t) {
           // An accented note gets BOTH the delay send and the selected param.
           // Delay is ON/OFF — its character is set in the FX tab, so send at
           // full level rather than scaling it by the accent intensity.
-          override.delaySend = 1;
-          if (yp && yp !== 'none' && yp !== 'delaySend') {
+          if (instDelayOn[inst.id]) override.delaySend = 1;
+          if (yp === 'note') {
+            // One octave chromatic above the track's Pitch (root). Sweep is
+            // forced off so the note sounds at its actual frequency.
+            const semi = Math.round((n.yVal ?? n.vel) * 12);
+            override.pitch = SP[inst.id].pitch * Math.pow(2, semi / 12);
+            // Tom needs sweep off to sound at its true pitch; kick keeps its
+            // sweep so it still reads as a kick while following the note.
+            if (inst.id === 'tom') override.sweep = 0;
+          } else if (yp && yp !== 'none' && yp !== 'delaySend') {
             const range = instYParamRange[inst.id] || { min:0, max:1 };
             override[yp] = range.min + (n.yVal ?? n.vel) * (range.max - range.min);
           }
@@ -2356,6 +2408,8 @@ function setupBandEvents(instId, canvas) {
     const { x, y } = getXY(e);
     const ds = drawSt[instId];
 
+    if (selectedInst !== instId) selectInst(instId);   // editing a lane selects it
+
     // Accent mode: paint accents only. No placing, resizing or volume drag.
     if (accentMode) {
       ds.active = true;
@@ -2366,10 +2420,18 @@ function setupBandEvents(instId, canvas) {
       ds.accentDragging = false;
       ds.accentSet = h ? !h.note.entangled : true;
       if (h) {
+        // Double-tap in accent mode = flush the custom value, back to
+        // following velocity (functionally a "remove" of the accent edit).
+        const now = Date.now();
+        if (h.note === lastAccentTapNote && now - lastAccentTapTime < 320) {
+          delete h.note.yVal;
+          h.note.entangled = true;
+          lastAccentTapNote = null;
+          renderBand(instId);
+          return;
+        }
+        lastAccentTapNote = h.note; lastAccentTapTime = now;
         h.note.entangled = ds.accentSet;
-        // Remember the note's own value; only seed from the track level if it
-        // has never been accented before.
-        if (ds.accentSet && h.note.yVal === undefined) h.note.yVal = accentLevel[instId];
         renderBand(instId);
       }
       return;
@@ -2421,7 +2483,9 @@ function setupBandEvents(instId, canvas) {
       // Vertical drag on the note you started on = set that note's accent value
       if (ds.accentNote && Math.abs(y - ds.startY) > 6) {
         ds.accentDragging = true;
-        ds.accentNote.yVal = yToVel(y);
+        let v = yToVel(y);
+        if (instYParam[instId] === 'note') v = Math.round(v * 12) / 12;  // snap to semitones
+        ds.accentNote.yVal = v;
         ds.accentNote.entangled = true;
         renderBand(instId);
         return;
@@ -2498,7 +2562,7 @@ function setupBandEvents(instId, canvas) {
   function onUp(e) {
     if (drawSt[instId].mode === 'accent') {
       const _ds = drawSt[instId];
-      if (_ds.accentDragging && _ds.accentNote) {
+      if (_ds.accentDragging && _ds.accentNote && autoPlayOnPlace) {
         resumeAC();
         triggerInst(instId, AC.currentTime + 0.01, _ds.accentNote.vel, _ds.accentNote.dur);
       }
@@ -2512,11 +2576,13 @@ function setupBandEvents(instId, canvas) {
 
     if (ds.mode === 'vel' || ds.mode === 'move' || ds.mode === 'pending-hit') {
       if (ds.mode === 'pending-hit' && ds.hitNote) {
-        // Single tap on note body — toggle entanglement only while in edit mode
-        if (instArmed[instId]) {
-          ds.hitNote.entangled = !ds.hitNote.entangled;
-        }
-        // No triggerInst here: avoids double-play on double-tap delete
+        // Single tap on a note toggles its FX on/off (binary). Values are
+        // edited in accent mode. No triggerInst: avoids double-play on the
+        // double-tap delete.
+        // Leave yVal undefined: the accent then FOLLOWS velocity via the
+        // `n.yVal ?? n.vel` fallback, until it's explicitly dragged in accent
+        // mode. Double-tap in accent mode clears it back to following.
+        ds.hitNote.entangled = !ds.hitNote.entangled;
       }
       // Velocity drag finished — play once at the new velocity so the user can hear it
       if (ds.mode === 'vel' && ds.hitNote && autoPlayOnPlace) {
@@ -2551,7 +2617,7 @@ function setupBandEvents(instId, canvas) {
     if (isTap) {
       const hit = noteHitTest(ds.startX);
       if (hit) {
-        // Tapping an existing note — no sound (avoids double-play on double-tap delete)
+        // handled by the pending-hit branch above
       } else {
         const step = xToStep(ds.startX);
         const dur = instSamples[instId] ? instSampleBeats[instId] : 1;
@@ -2616,6 +2682,7 @@ function setupBandEvents(instId, canvas) {
 const instVol        = { kick:0.9, snare:0.9, hihat:0.9, tom:0.9 };
 const instYParam     = { kick:null, snare:null, hihat:null, tom:null }; // null = vol drag
 const instArmed      = { kick:false, snare:false, hihat:false, tom:false }; // tap-to-entangle edit mode
+const instDelayOn    = { kick:true,  snare:true,  hihat:true,  tom:true  }; // delay send, independent of the param
 const instYParamRange = { kick:{min:0,max:1}, snare:{min:0,max:1}, hihat:{min:0,max:1}, tom:{min:0,max:1} };
 // Saved per-note entanglement state for the 3-way cycle (off → all → saved → off)
 const instEntangleSaved = { kick:null, snare:null, hihat:null, tom:null };
@@ -2650,8 +2717,10 @@ function showYParamPicker(instId, anchorEl) {
   const inst = INSTRUMENTS.find(i => i.id === instId);
 
   picker.dataset.inst = instId;
+  const pitched = (instId === 'tom' || instId === 'kick');
   picker.innerHTML =
-    `<div class="yparam-opt${current === 'delaySend' ? ' active' : ''}" data-key="delaySend" data-min="0" data-max="1">Delay send</div>` +
+    `<div class="yparam-opt${instDelayOn[instId] ? ' active' : ''}" data-key="delaySend" data-min="0" data-max="1">Delay send</div>` +
+    (pitched ? `<div class="yparam-opt${current === 'note' ? ' active' : ''}" data-key="note" data-min="0" data-max="1">Note</div>` : '') +
     defs.map(d => `<div class="yparam-opt${current === d.k ? ' active' : ''}" data-key="${d.k}" data-min="${d.min}" data-max="${d.max}">${d.l}</div>`).join('');
 
   // Position: to the right of anchor, clamped to screen
@@ -2673,12 +2742,23 @@ function showYParamPicker(instId, anchorEl) {
     opt.addEventListener('click', (e) => {
       e.stopPropagation();
       const k = opt.dataset.key;
-      instYParam[instId] = k === 'none' ? 'none' : k;
-      instArmed[instId] = (k !== 'none');
-      if (instYParam[instId] && instYParam[instId] !== 'none') {
+      if (k === 'delaySend') {
+        instDelayOn[instId] = !instDelayOn[instId];        // independent toggle
+      } else if (instYParam[instId] === k) {
+        instYParam[instId] = null;                          // tap again = off
+        instArmed[instId] = false;
+      } else {
+        instYParam[instId] = k;
+        instArmed[instId] = true;
         instYParamRange[instId] = { min: +opt.dataset.min, max: +opt.dataset.max };
       }
-      picker.classList.remove('visible');
+      // Repaint every option, not just the clicked one, or a stale highlight
+      // makes it look like several params are active at once.
+      picker.querySelectorAll('.yparam-opt').forEach(o => {
+        const ok = o.dataset.key;
+        o.classList.toggle('active',
+          ok === 'delaySend' ? instDelayOn[instId] : instYParam[instId] === ok);
+      });
       updateMuteBtn(instId);
       renderBand(instId);
     });
@@ -2688,9 +2768,15 @@ function showYParamPicker(instId, anchorEl) {
 function updateMuteBtn(instId) {
   const yInd = document.getElementById('yparam-ind-' + instId);
   if (yInd) {
+    // Show every active accent target: delay and/or the picked parameter.
     const param = instYParam[instId];
-    if (instArmed[instId] && param && param !== 'none') {
-      yInd.textContent = param.toUpperCase();
+    const parts = [];
+    if (instDelayOn[instId]) parts.push('DLY');
+    if (instArmed[instId] && param && param !== 'none' && param !== 'delaySend') {
+      parts.push(param.toUpperCase());
+    }
+    if (parts.length) {
+      yInd.textContent = parts.join(' · ');
       yInd.style.display = 'block';
     } else {
       yInd.textContent = '';
@@ -2854,7 +2940,16 @@ function buildBands() {
           const now = Date.now();
           const isDoubleTap = (now - lastLblTap) < 320;
           lastLblTap = isDoubleTap ? 0 : now; // reset so triple-tap doesn't re-trigger
-          if (!isDoubleTap) selectInst(inst.id);
+          if (!isDoubleTap) {
+            const pk = document.getElementById('yparam-picker');
+            if (selectedInst === inst.id && pk.dataset.wasOpen !== '1') {
+              showYParamPicker(inst.id, lbl);   // already selected → open picker
+            } else if (pk.dataset.wasOpen === '1' && pk.dataset.inst === inst.id) {
+              pk.classList.remove('visible');   // tapped again → close
+            } else {
+              selectInst(inst.id);
+            }
+          }
 
           if (isDoubleTap) {
             // Double tap — toggle mute
@@ -2873,25 +2968,7 @@ function buildBands() {
             renderBand(inst.id);
           } else {
             // Single tap — select instrument / cycle entanglement
-            if (instArmed[inst.id]) {
-              const ns = notes[inst.id] || [];
-              const allOn  = ns.length > 0 && ns.every(n => n.entangled);
-              const allOff = ns.every(n => !n.entangled);
-              const hasSaved = instEntangleSaved[inst.id] !== null;
-              if (allOff) {
-                instEntangleSaved[inst.id] = ns.map(n => n.entangled);
-                ns.forEach(n => { n.entangled = true; });
-              } else if (allOn && hasSaved) {
-                const saved = instEntangleSaved[inst.id];
-                ns.forEach((n, i) => { n.entangled = saved[i] ?? false; });
-              } else {
-                instEntangleSaved[inst.id] = ns.map(n => n.entangled);
-                ns.forEach(n => { n.entangled = false; });
-              }
-              renderBand(inst.id);
-            } else {
-              selectInst(inst.id);
-            }
+            selectInst(inst.id);
           }
         }
       }
@@ -2945,10 +3022,9 @@ const PRESETS = {
     { name: 'Default',   p: { pitch:52,  sweep:4,  punch:0.75, click:0.4,  body:0.65, sub:0.3,  decay:0.55, drive:0.18 } },
     { name: 'Punchy',    p: { pitch:60,  sweep:7,  punch:0.95, click:0.6,  body:0.5,  sub:0.15, decay:0.32, drive:0.35 } },
     { name: 'Deep',      p: { pitch:38,  sweep:4,  punch:0.4,  click:0.1,  body:0.9,  sub:0.8,  decay:0.9,  drive:0.08 } },
-    { name: 'Clicky',    p: { pitch:72,  sweep:2,  punch:0.8,  click:1.0,  body:0.2,  sub:0.0,  decay:0.18, drive:0.55 } },
+    { name: 'Clicky',    p: { pitch:68,  sweep:2,  punch:0.9,  click:0.9,  body:0.25, sub:0.0,  decay:0.20, drive:0.48 } },
     { name: 'Distorted', p: { pitch:50,  sweep:5,  punch:0.85, click:0.5,  body:0.7,  sub:0.2,  decay:0.45, drive:1.35 } },
     { name: '808',       p: { pitch:42,  sweep:8,  punch:0.5,  click:0.05, body:1.0,  sub:0.6,  decay:1.8,  drive:0.25 } },
-    { name: 'Snappy',    p: { pitch:65,  sweep:3,  punch:1.0,  click:0.8,  body:0.3,  sub:0.0,  decay:0.22, drive:0.4  } },
     { name: 'Vintage',   p: { pitch:55,  sweep:10, punch:0.6,  click:0.3,  body:0.75, sub:0.45, decay:0.6,  drive:0.6  } },
     { name: 'Sub Boom',  p: { pitch:35,  sweep:4,  punch:0.3,  click:0.0,  body:0.8,  sub:1.0,  decay:1.2,  drive:0.3  } },
     { name: 'Hard',      p: { pitch:58,  sweep:5,  punch:0.9,  click:0.7,  body:0.6,  sub:0.1,  decay:0.28, drive:1.5  } },
@@ -2978,6 +3054,7 @@ const PRESETS = {
     { name: 'High',     p: { pitch:130, sweep:10, attack:0.01,  body:0.45, decay:0.22, drive:0.0  } },
     { name: 'Bongo',    p: { pitch:160, sweep:14, attack:0.015, body:0.3,  decay:0.15, drive:0.0  } },
     { name: 'Punchy',   p: { pitch:90,  sweep:10, attack:0.001, body:0.7,  decay:0.25, drive:0.4  } },
+    { name: 'Bassline', p: { pitch:65,  sweep:0,  attack:0.004, body:0.8,  decay:0.4,  drive:0.25 } },
     { name: 'Gritty',   p: { pitch:70,  sweep:6,  attack:0.003, body:0.8,  decay:0.4,  drive:1.1  } },
     { name: 'Soft',     p: { pitch:100, sweep:5,  attack:0.03,  body:0.5,  decay:0.45, drive:0.0  } },
   ],
@@ -3176,7 +3253,7 @@ function renderFXPanel(inner, inst) {
 function fmtParam(min, max, val, fmt) {
   if (val === undefined || val === null) return '—';
   if (fmt === '1s') return (+val).toFixed(1) + 's';
-  if (max <= 1) return (+val).toFixed(2);
+  if (max <= 3) return (+val).toFixed(2);
   if (max > 1000) return Math.round(val) + 'hz';
   return Math.round(val);
 }
@@ -4317,7 +4394,27 @@ document.getElementById('fs-btn').addEventListener('click', () => {
     (document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen).call(document);
   }
 });
+// ── Screen wake lock ───────────────────────────────────────────────
+// Keeps the phone from dimming/sleeping while jamming. Held whenever the app
+// is fullscreen, and re-acquired when returning from the background (the OS
+// silently drops the lock when the page is hidden).
+let wakeLock = null;
+async function acquireWakeLock() {
+  if (!('wakeLock' in navigator) || wakeLock) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch (e) { /* denied or unsupported — not fatal */ }
+}
+function releaseWakeLock() {
+  if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && document.fullscreenElement) acquireWakeLock();
+});
+
 document.addEventListener('fullscreenchange', () => {
+  if (document.fullscreenElement) acquireWakeLock(); else releaseWakeLock();
   document.getElementById('fs-btn').textContent = document.fullscreenElement ? '✕' : '⛶';
 });
 
